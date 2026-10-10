@@ -130,22 +130,46 @@ class LaneView extends PositionComponent with HasGameReference<BusEscapeGame> {
 
 typedef _LaneBody = ({Rect body, Rect glass, Rect cab});
 
-_LaneBody _laneBody(Rect slot, ParkedBus p) {
-  final length = p.capacity ~/ Bus.seatsPerCell;
+VehicleKind _kindOf(ParkedBus p) => VehicleKind.of(
+  length: p.capacity ~/ Bus.seatsPerCell,
+  colorIndex: p.colorIndex,
+);
+
+/// How much of its bay a parked vehicle fills. The bus fills it; the
+/// others are proportionally shorter, so a bus is always a little longer.
+({double w, double h}) _bayFill(VehicleKind kind) => switch (kind) {
+  VehicleKind.bus => (w: 1.0, h: 1.0),
+  VehicleKind.coaster || VehicleKind.fireTruck => (w: 0.94, h: 0.8),
+  VehicleKind.sedan || VehicleKind.policeCar => (w: 0.86, h: 0.62),
+};
+
+/// Size of a parked vehicle in [slot]; the flight shrinks to exactly this.
+Size laneVehicleSize(Rect slot, ParkedBus p) {
+  final f = _bayFill(_kindOf(p));
   final inner = slot.deflate(3);
-  final h = inner.height * (length <= 2 ? 0.72 : 1.0);
-  final body = Rect.fromLTWH(inner.left, inner.bottom - h, inner.width, h);
+  return Size(inner.width * f.w, inner.height * f.h);
+}
+
+_LaneBody _laneBody(Rect slot, ParkedBus p) {
+  final size = laneVehicleSize(slot, p);
+  final body = Rect.fromCenter(
+    center: slot.center,
+    width: size.width,
+    height: size.height,
+  );
   final glass = Rect.fromLTWH(
     body.left + body.width * 0.16,
     body.top + 3,
     body.width * 0.68,
     body.height * 0.1,
   );
+  // A fire truck keeps a rack for its ladder at the back.
+  final rear = _kindOf(p) == VehicleKind.fireTruck ? body.height * 0.16 : 4.0;
   final cab = Rect.fromLTRB(
     body.left + body.width * 0.11,
     glass.bottom + 3,
     body.right - body.width * 0.11,
-    body.bottom - 4,
+    body.bottom - rear,
   );
   return (body: body, glass: glass, cab: cab);
 }
@@ -165,17 +189,21 @@ _LaneBody _laneBody(Rect slot, ParkedBus p) {
 }
 
 /// A parked vehicle seen from above, nose up, roof open so the seats show:
-/// empty seats are plain, boarded ones hold a passenger. Cars fill part of
-/// the slot, buses all of it.
+/// empty seats are plain, boarded ones hold a passenger. Each kind has its
+/// own fixed size in the bay.
 void paintLaneVehicle(
   Canvas canvas,
   Rect slot,
   ParkedBus p, {
   bool symbols = false,
 }) {
-  final color = busColors[p.colorIndex % busColors.length];
+  final kind = _kindOf(p);
+  final color = colorFor(p.colorIndex);
   final (:body, :glass, :cab) = _laneBody(slot, p);
-  final radius = Radius.circular(body.width * 0.28);
+  final radius = Radius.circular(
+    body.width *
+        (kind == VehicleKind.bus || kind == VehicleKind.fireTruck ? 0.2 : 0.3),
+  );
 
   canvas.drawRRect(
     RRect.fromRectAndRadius(body.translate(1.5, 2.5).inflate(1), radius),
@@ -195,6 +223,7 @@ void paintLaneVehicle(
     RRect.fromRectAndRadius(glass, const Radius.circular(3)),
     Paint()..color = const Color(0xE63A526B),
   );
+  _laneBadge(canvas, kind, body, glass);
   if (symbols) {
     paintSymbol(
       canvas,
@@ -225,8 +254,68 @@ void paintLaneVehicle(
       Paint()..color = const Color(0xFFD9B27C),
     );
     if (i < p.boarded) {
-      paintPerson(canvas, c.translate(0, -1), color, scale: seat / 20);
+      paintPassenger(
+        canvas,
+        c.translate(0, -1),
+        p.colorIndex,
+        scale: seat / 20,
+      );
     }
+  }
+}
+
+/// What tells a police car or fire truck apart in the bay.
+void _laneBadge(Canvas canvas, VehicleKind kind, Rect body, Rect glass) {
+  switch (kind) {
+    case VehicleKind.policeCar:
+      final bar = Rect.fromCenter(
+        center: Offset(body.center.dx, glass.bottom + 0.5),
+        width: body.width * 0.5,
+        height: 3.2,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTRB(bar.left, bar.top, bar.center.dx, bar.bottom),
+          const Radius.circular(1.5),
+        ),
+        Paint()..color = const Color(0xFFFF4A4A),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTRB(bar.center.dx, bar.top, bar.right, bar.bottom),
+          const Radius.circular(1.5),
+        ),
+        Paint()..color = const Color(0xFF4AA3FF),
+      );
+      canvas.drawLine(
+        Offset(body.left + 2, body.bottom - 2.5),
+        Offset(body.right - 2, body.bottom - 2.5),
+        Paint()
+          ..color = const Color(0xFF2B4C9B)
+          ..strokeWidth = 2,
+      );
+    case VehicleKind.fireTruck:
+      final rack = Rect.fromLTRB(
+        body.left + body.width * 0.14,
+        body.bottom - body.height * 0.14,
+        body.right - body.width * 0.14,
+        body.bottom - 3,
+      );
+      final rail = Paint()
+        ..color = const Color(0xFFCFD6DD)
+        ..strokeWidth = 1.6
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(rack.topLeft, rack.topRight, rail);
+      canvas.drawLine(rack.bottomLeft, rack.bottomRight, rail);
+      final rung = Paint()
+        ..color = const Color(0xFF9AA4AE)
+        ..strokeWidth = 1;
+      for (var i = 0; i < 6; i++) {
+        final x = rack.left + rack.width * (i + 0.5) / 6;
+        canvas.drawLine(Offset(x, rack.top), Offset(x, rack.bottom), rung);
+      }
+    case VehicleKind.sedan || VehicleKind.coaster || VehicleKind.bus:
+      break;
   }
 }
 

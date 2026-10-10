@@ -5,7 +5,6 @@ import 'package:flame/components.dart';
 
 import 'bus_escape_game.dart';
 import 'layout.dart';
-import 'palette.dart';
 import 'symbols.dart';
 import 'vehicle_painter.dart';
 
@@ -66,7 +65,7 @@ class QueueView extends PositionComponent with HasGameReference<BusEscapeGame> {
         Rect.fromCenter(center: p.translate(0, 13), width: 14, height: 5),
         Paint()..color = const Color(0x22000000),
       );
-      paintPerson(canvas, p, busColors[person.color % busColors.length]);
+      paintPassenger(canvas, p, person.color);
       if (game.showSymbols) {
         paintSymbol(canvas, p.translate(0, 4), 8, symbolFor(person.color));
       }

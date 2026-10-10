@@ -10,7 +10,6 @@ import 'package:flutter/animation.dart';
 import 'bus_escape_game.dart';
 import 'lane_view.dart';
 import 'layout.dart';
-import 'palette.dart';
 import 'symbols.dart';
 import 'vehicle_painter.dart';
 
@@ -113,6 +112,7 @@ class BusComponent extends PositionComponent
   double _flightT = 0;
   double _flightDuration = 1;
   Direction _heading = Direction.north;
+  int _slot = 0;
   bool _inBay = false;
   VoidCallback? _onArrived;
 
@@ -171,6 +171,7 @@ class BusComponent extends PositionComponent
     _flightT = 0;
     _flightDuration = _flightTime(route);
     _onArrived = onArrived;
+    _slot = slot;
     _applyPose(route.first, route[1]);
   }
 
@@ -189,13 +190,27 @@ class BusComponent extends PositionComponent
     _flightT = t;
     final p = (_flightT / _flightDuration).clamp(0.0, 1.0);
     final eased = Curves.easeInOutSine.transform(p);
-    var left = eased * _routeLength(route);
+    final total = _routeLength(route);
+    var left = eased * total;
+    // Shrink from jam size to bay size while driving, so the vehicle
+    // reaches its bay already the size it will park at.
+    final firstPart = total - route.last.distanceTo(route[route.length - 2]);
+    final morph = firstPart <= 0
+        ? 1.0
+        : Curves.easeInOut.transform(
+            ((left / firstPart - 0.2) / 0.8).clamp(0.0, 1.0),
+          );
     for (var i = 1; i < route.length; i++) {
       final seg = route[i].distanceTo(route[i - 1]);
       if (left <= seg || i == route.length - 1) {
         final t = seg == 0 ? 1.0 : (left / seg).clamp(0.0, 1.0);
         position = route[i - 1] + (route[i] - route[i - 1]) * t;
-        _applyPose(route[i - 1], route[i], last: i == route.length - 1);
+        _applyPose(
+          route[i - 1],
+          route[i],
+          last: i == route.length - 1,
+          morph: morph,
+        );
         break;
       }
       left -= seg;
@@ -208,7 +223,12 @@ class BusComponent extends PositionComponent
     }
   }
 
-  void _applyPose(Vector2 from, Vector2 to, {bool last = false}) {
+  void _applyPose(
+    Vector2 from,
+    Vector2 to, {
+    bool last = false,
+    double morph = 0,
+  }) {
     final d = to - from;
     final h = d.x.abs() > d.y.abs()
         ? (d.x > 0 ? Direction.east : Direction.west)
@@ -216,13 +236,20 @@ class BusComponent extends PositionComponent
     _heading = h;
     _inBay = last && h == Direction.north;
     final cell = game.layout.cellSize;
+    final slot = game.layout.laneSlotRect(_slot);
     if (_inBay) {
-      final r = game.layout.laneSlotRect(0);
-      size = Vector2(r.width, r.height);
-    } else {
-      final long = bus.length * cell;
-      size = h.isHorizontal ? Vector2(long, cell) : Vector2(cell, long);
+      size = Vector2(slot.width, slot.height);
+      return;
     }
+    final parked = ParkedBus(
+      id: bus.id,
+      colorIndex: bus.colorIndex,
+      capacity: bus.capacity,
+    );
+    final lane = laneVehicleSize(slot, parked); // nose up: (wide, long)
+    final long = bus.length * cell + (lane.height - bus.length * cell) * morph;
+    final wide = cell + (lane.width - cell) * morph;
+    size = h.isHorizontal ? Vector2(long, wide) : Vector2(wide, long);
   }
 
   void shake() {
@@ -259,7 +286,7 @@ class BusComponent extends PositionComponent
     final roof = paintVehicle(
       canvas,
       r,
-      busColors[bus.colorIndex % busColors.length],
+      bus.colorIndex,
       dir,
       length: bus.length,
       depth: cell * vehicleDepthFactor,
