@@ -96,6 +96,10 @@ class BusEscapeGame extends FlameGame {
   /// Passengers on their way to a vehicle's seats, per bay.
   final Map<int, int> _inFlight = {};
 
+  /// Vehicles sent off early; their remaining passengers were already
+  /// taken off the queue, so later boarding steps for them are skipped.
+  final Set<int> _sentOff = {};
+
   /// Whether vehicle [id] may pull into [bay] yet.
   bool mayEnter(int bay, int id) => _bayOcc[bay] == id;
 
@@ -104,6 +108,7 @@ class BusEscapeGame extends FlameGame {
     _bayOfBus.clear();
     _bayWaiting.clear();
     _inFlight.clear();
+    _sentOff.clear();
     final lane = session.state.lane;
     for (var i = 0; i < lane.length; i++) {
       final p = lane[i];
@@ -115,9 +120,9 @@ class BusEscapeGame extends FlameGame {
     _queue.reset(session.state.queue);
   }
 
-  /// The next open bay with nobody in it. Failing that, the first bay whose
-  /// vehicle is already on its way out (the new one holds back until it is
-  /// gone).
+  /// The next open bay with nobody in it. Failing that, a bay whose vehicle
+  /// core state has already sent away (it is only still boarding on screen),
+  /// which [_sendOff] then clears at once so nobody has to wait.
   int _pickBay(int preferred, GameState after) {
     final inLane = {
       for (final p in after.lane)
@@ -125,9 +130,37 @@ class BusEscapeGame extends FlameGame {
     };
     final open = [for (var b = 0; b < layout.laneSlots; b++) b];
     final free = open.where((b) => !_bayOcc.containsKey(b)).toList();
-    if (free.isNotEmpty) return free.contains(preferred) ? preferred : free.first;
+    if (free.isNotEmpty) {
+      return free.contains(preferred) ? preferred : free.first;
+    }
     final leaving = open.where((b) => !inLane.contains(_bayOcc[b])).toList();
+    for (final b in leaving) {
+      if (_lane.bays[b]?.id == _bayOcc[b]) return b; // parked: can go now
+    }
     return leaving.isNotEmpty ? leaving.first : preferred;
+  }
+
+  /// Seats a leaving vehicle's remaining passengers at once and drives it
+  /// off, freeing its bay immediately.
+  void _sendOff(int bay) {
+    final id = _bayOcc[bay];
+    final parked = _lane.bays[bay];
+    if (id == null || parked == null || parked.id != id) return;
+    final remaining = parked.capacity - parked.boarded - (_inFlight[bay] ?? 0);
+    for (var i = 0; i < remaining; i++) {
+      _queue.take(parked.colorIndex);
+    }
+    _sentOff.add(id);
+    _inFlight[bay] = 0;
+    _depart(bay, parked.withBoarded(parked.capacity));
+    _freeBay(bay);
+  }
+
+  void _depart(int bay, ParkedBus full) {
+    _lane.bays.remove(bay);
+    _bayOfBus.remove(full.id);
+    feedback?.emit(GameEvent.depart);
+    world.add(DepartingBus(slot: bay, bus: full));
   }
 
   /// Returns true if [id] got [bay] straight away.
@@ -257,6 +290,7 @@ class BusEscapeGame extends FlameGame {
   }
 
   void _sendPassenger(int busId, int color) {
+    if (_sentOff.contains(busId)) return;
     final bay = _bayOfBus[busId];
     final parked = bay == null ? null : _lane.bays[bay];
     if (bay == null || parked == null || parked.id != busId) return;
@@ -275,9 +309,9 @@ class BusEscapeGame extends FlameGame {
   }
 
   void _passengerSeated(int bay, int busId) {
-    _inFlight[bay] = max(0, (_inFlight[bay] ?? 1) - 1);
     final parked = _lane.bays[bay];
     if (parked == null || parked.id != busId) return;
+    _inFlight[bay] = max(0, (_inFlight[bay] ?? 1) - 1);
     final now = parked.withBoarded(parked.boarded + 1);
     if (!now.isFull) {
       _lane.bays[bay] = now;
@@ -285,10 +319,7 @@ class BusEscapeGame extends FlameGame {
       return;
     }
     // Full: off it goes, and the bay is free for the next vehicle.
-    _lane.bays.remove(bay);
-    _bayOfBus.remove(busId);
-    feedback?.emit(GameEvent.depart);
-    world.add(DepartingBus(slot: bay, bus: now));
+    _depart(bay, now);
     _runAfter(0.3, () => _freeBay(bay));
   }
 
@@ -492,6 +523,10 @@ class BusEscapeGame extends FlameGame {
     final events = eventsForMove(before, after);
     final delta = laneDelta(before, after, comp.bus);
     final bay = _pickBay(delta.slot, after);
+    final occupant = _bayOcc[bay];
+    if (occupant != null && !after.lane.any((p) => p?.id == occupant)) {
+      _sendOff(bay); // it is leaving anyway; don't make this one wait
+    }
     _bayOfBus[id] = bay;
     final immediate = _claimBay(bay, id);
     final flight = airlift

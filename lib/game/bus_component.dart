@@ -23,6 +23,9 @@ class BusComponent extends PositionComponent
   static int _bottomRow(Bus bus) =>
       bus.dir.isHorizontal ? bus.row : bus.row + bus.length - 1;
 
+  /// Vehicles in transit draw above the grid; later ones above earlier ones.
+  static int _flyPriority = 200;
+
   final Bus bus;
   Vector2? _home;
 
@@ -81,7 +84,7 @@ class BusComponent extends PositionComponent
   void liftToLane(int slot, VoidCallback onArrived, bool Function() gate) {
     _gate = gate;
     _onArrived = onArrived;
-    priority = 200;
+    priority = ++_flyPriority;
     _liftSlot = slot; // takes off once the bay is free
   }
 
@@ -161,7 +164,7 @@ class BusComponent extends PositionComponent
   void exitToLane(int slot, VoidCallback onArrived, bool Function() gate) {
     _gate = gate;
     final route = _routeTo(slot);
-    priority = 200; // fly above everything else
+    priority = ++_flyPriority; // fly above everything else
     anchor = Anchor.center;
     position = route.first.clone();
     _route = route;
