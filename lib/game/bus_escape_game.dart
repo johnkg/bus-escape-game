@@ -100,6 +100,11 @@ class BusEscapeGame extends FlameGame {
   /// taken off the queue, so later boarding steps for them are skipped.
   final Set<int> _sentOff = {};
 
+  /// Vehicles still driving in that core state has already sent away. Their
+  /// bay was handed to the next vehicle, so on arrival they just seat their
+  /// passengers and pull away again without using it.
+  final Set<int> _instantLeave = {};
+
   /// Game time, in seconds.
   double _clock = 0;
 
@@ -116,7 +121,7 @@ class BusEscapeGame extends FlameGame {
 
   /// Minimum gap between vehicles setting off, so several tapped at once
   /// drive in single file instead of on top of each other.
-  static const double _launchGap = 0.2;
+  static const double _launchGap = 0.15;
 
   @override
   void update(double dt) {
@@ -125,7 +130,8 @@ class BusEscapeGame extends FlameGame {
   }
 
   /// Whether vehicle [id] may pull into [bay] yet.
-  bool mayEnter(int bay, int id) => _bayOcc[bay] == id;
+  bool mayEnter(int bay, int id) =>
+      _bayOcc[bay] == id || _instantLeave.contains(id);
 
   void _syncBays() {
     _bayOcc.clear();
@@ -133,6 +139,7 @@ class BusEscapeGame extends FlameGame {
     _bayWaiting.clear();
     _inFlight.clear();
     _sentOff.clear();
+    _instantLeave.clear();
     final lane = session.state.lane;
     for (var i = 0; i < lane.length; i++) {
       final p = lane[i];
@@ -178,6 +185,21 @@ class BusEscapeGame extends FlameGame {
     _inFlight[bay] = 0;
     _depart(bay, parked.withBoarded(parked.capacity));
     _freeBay(bay);
+  }
+
+  /// A vehicle that core state sends away the moment it parks: its
+  /// passengers take their seats at once and it pulls away without using
+  /// the bay.
+  void _leaveOnArrival(int bay, ParkedBus parked) {
+    for (var i = 0; i < parked.capacity; i++) {
+      _queue.take(parked.colorIndex);
+    }
+    _sentOff.add(parked.id);
+    _bayOfBus.remove(parked.id);
+    feedback?.emit(GameEvent.depart);
+    world.add(
+      DepartingBus(slot: bay, bus: parked.withBoarded(parked.capacity)),
+    );
   }
 
   void _depart(int bay, ParkedBus full) {
@@ -597,7 +619,13 @@ class BusEscapeGame extends FlameGame {
     final bay = _pickBay(delta.slot, after);
     final occupant = _bayOcc[bay];
     if (occupant != null && !after.lane.any((p) => p?.id == occupant)) {
-      _sendOff(bay); // it is leaving anyway; don't make this one wait
+      // It is leaving anyway; don't make this one wait for it.
+      if (_lane.bays[bay]?.id == occupant) {
+        _sendOff(bay);
+      } else {
+        _instantLeave.add(occupant); // still driving in
+        _bayOcc.remove(bay);
+      }
     }
     _bayOfBus[id] = bay;
     final immediate = _claimBay(bay, id);
@@ -617,7 +645,12 @@ class BusEscapeGame extends FlameGame {
     stateNotifier.value = after; // the screen reads resultDelay from here
     void arrived() {
       comp.removeFromParent();
-      _lane.bays[bay] = delta.before[delta.slot]!;
+      final parked = delta.before[delta.slot]!;
+      if (_instantLeave.remove(id)) {
+        _leaveOnArrival(bay, parked);
+      } else {
+        _lane.bays[bay] = parked;
+      }
       move.arrived = true;
       _drain();
     }
