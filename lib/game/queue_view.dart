@@ -14,7 +14,7 @@ class QueueView extends PositionComponent with HasGameReference<BusEscapeGame> {
 
   @override
   void render(Canvas canvas) {
-    final q = game.session.state.queue;
+    final q = game.queueShown ?? game.session.state.queue;
     final n = q.length < GameLayout.queueVisible
         ? q.length
         : GameLayout.queueVisible;

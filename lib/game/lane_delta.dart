@@ -16,6 +16,7 @@ class LaneDelta {
     required this.before,
     required this.boardedSlots,
     required this.departed,
+    this.boardCounts = const {},
   });
 
   /// Slot the exiting bus parked in.
@@ -27,6 +28,9 @@ class LaneDelta {
   /// Slots (ascending) where at least one passenger boarded.
   final List<int> boardedSlots;
   final List<DepartedBus> departed;
+
+  /// Passengers who boarded, per slot.
+  final Map<int, int> boardCounts;
 }
 
 /// [exited] is the vehicle that just left the jam, or null when nothing
@@ -45,15 +49,18 @@ LaneDelta laneDelta(GameState before, GameState after, Bus? exited) {
 
   final boarded = <int>[];
   final departed = <DepartedBus>[];
+  final counts = <int, int>{};
   for (var i = 0; i < parked.length; i++) {
     final b = parked[i];
     final a = after.lane[i];
     if (b == null) continue;
     if (a == null) {
       boarded.add(i);
+      counts[i] = b.capacity - b.boarded;
       departed.add(DepartedBus(i, b.withBoarded(b.capacity)));
     } else if (a.boarded > b.boarded) {
       boarded.add(i);
+      counts[i] = a.boarded - b.boarded;
     }
   }
   return LaneDelta(
@@ -61,5 +68,6 @@ LaneDelta laneDelta(GameState before, GameState after, Bus? exited) {
     before: parked,
     boardedSlots: boarded,
     departed: departed,
+    boardCounts: counts,
   );
 }
