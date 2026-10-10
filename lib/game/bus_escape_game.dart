@@ -100,6 +100,30 @@ class BusEscapeGame extends FlameGame {
   /// taken off the queue, so later boarding steps for them are skipped.
   final Set<int> _sentOff = {};
 
+  /// Game time, in seconds.
+  double _clock = 0;
+
+  /// Moves whose vehicle is driving in, in tap order. Boarding is played
+  /// strictly in this order so the passenger queue is served front first,
+  /// whichever vehicle happens to arrive first.
+  final List<_Move> _moves = [];
+  double _nextBoardAt = 0;
+  bool _drainScheduled = false;
+
+  /// Planning clocks, used only to time the result dialog.
+  double _boardFreeAt = 0;
+  double _lastLaunch = -1;
+
+  /// Minimum gap between vehicles setting off, so several tapped at once
+  /// drive in single file instead of on top of each other.
+  static const double _launchGap = 0.2;
+
+  @override
+  void update(double dt) {
+    _clock += dt;
+    super.update(dt);
+  }
+
   /// Whether vehicle [id] may pull into [bay] yet.
   bool mayEnter(int bay, int id) => _bayOcc[bay] == id;
 
@@ -232,6 +256,11 @@ class BusEscapeGame extends FlameGame {
       t.removeFromParent();
     }
     _pending.clear();
+    _moves.clear();
+    _drainScheduled = false;
+    _nextBoardAt = 0;
+    _boardFreeAt = 0;
+    _lastLaunch = -1;
     _lane.reset();
     for (final c in [
       ...world.children.whereType<DepartingBus>(),
@@ -448,10 +477,12 @@ class BusEscapeGame extends FlameGame {
       queue: Rules.sortedQueue(before),
     );
 
-    resultDelay = _resultDelayFor(after.status, events, delta, 0, 0);
     feedback?.emit(GameEvent.booster);
-    stateNotifier.value = after;
-    _scheduleEvents(events, delta, from: 0);
+    final move = _Move(events, delta, from: 0)..arrived = true;
+    _planMove(move, after.status, _clock);
+    _moves.add(move);
+    stateNotifier.value = after; // the screen reads resultDelay from here
+    _drain();
     return true;
   }
 
@@ -499,6 +530,47 @@ class BusEscapeGame extends FlameGame {
     }
   }
 
+  /// Seconds from the first to the last passenger setting off.
+  double _launchSpan(LaneDelta delta) {
+    final n = delta.boardingOrder.length;
+    return n <= 1 ? 0 : _strideFor(n) * (n - 1);
+  }
+
+  /// Estimates when [move] will have played out (for the result dialog),
+  /// given that its vehicle is in a bay at [arriveAt].
+  void _planMove(_Move move, GameStatus status, double arriveAt) {
+    final startAt = max(arriveAt, _boardFreeAt);
+    _boardFreeAt = startAt + _launchSpan(move.delta) + 0.08;
+    resultDelay = _resultDelayFor(
+      status,
+      move.events,
+      move.delta,
+      move.from,
+      startAt - _clock,
+    );
+  }
+
+  /// Starts the boarding of every move that has arrived, one at a time and
+  /// in tap order.
+  void _drain() {
+    while (_moves.isNotEmpty && _moves.first.arrived) {
+      final wait = _nextBoardAt - _clock;
+      if (wait > 0.001) {
+        if (!_drainScheduled) {
+          _drainScheduled = true;
+          _runAfter(wait, () {
+            _drainScheduled = false;
+            _drain();
+          });
+        }
+        return;
+      }
+      final move = _moves.removeAt(0);
+      _nextBoardAt = _clock + _launchSpan(move.delta) + 0.08;
+      _scheduleEvents(move.events, move.delta, from: move.from);
+    }
+  }
+
   void tapBus(int id) {
     final before = session.state;
     if (before.status != GameStatus.playing) return;
@@ -529,27 +601,41 @@ class BusEscapeGame extends FlameGame {
     }
     _bayOfBus[id] = bay;
     final immediate = _claimBay(bay, id);
+    final launchAt = max(_clock, _lastLaunch + _launchGap);
+    _lastLaunch = launchAt;
     final flight = airlift
         ? BusComponent.liftSeconds
         : comp.flightSeconds(bay);
     // A vehicle held back for a bay that is still emptying arrives later.
     final wait = immediate ? 0.0 : 1.2;
 
-    // Time the result dialog to land after the last animation.
-    resultDelay = _resultDelayFor(after.status, events, delta, 1, flight + wait);
-
     feedback?.emit(events.first);
     _buses.remove(id);
-    stateNotifier.value = after;
+    final move = _Move(events, delta);
+    _planMove(move, after.status, launchAt + flight + wait);
+    _moves.add(move);
+    stateNotifier.value = after; // the screen reads resultDelay from here
     void arrived() {
       comp.removeFromParent();
       _lane.bays[bay] = delta.before[delta.slot]!;
-      _scheduleEvents(events, delta);
+      move.arrived = true;
+      _drain();
     }
 
     bool gate() => mayEnter(bay, id);
-    airlift
+    void launch() => airlift
         ? comp.liftToLane(bay, arrived, gate)
         : comp.exitToLane(bay, arrived, gate);
+    _runAfter(launchAt - _clock, launch);
   }
+}
+
+/// A tapped vehicle's pending effects, played once it has arrived.
+class _Move {
+  _Move(this.events, this.delta, {this.from = 1});
+
+  final List<GameEvent> events;
+  final LaneDelta delta;
+  final int from;
+  bool arrived = false;
 }
