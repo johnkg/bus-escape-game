@@ -240,7 +240,7 @@ class BusEscapeGame extends FlameGame {
   double _strideFor(int total) => total <= 1 ? 0 : min(_stride, 0.9 / total);
 
   double _boardSeconds(LaneDelta delta) {
-    final total = delta.boardCounts.values.fold(0, (a, b) => a + b);
+    final total = delta.boardingOrder.length;
     if (total == 0) return 0;
     return _strideFor(total) * (total - 1) + BoardingPassenger.duration;
   }
@@ -248,15 +248,11 @@ class BusEscapeGame extends FlameGame {
   /// Walks the passengers into their vehicles one at a time. A vehicle
   /// pulls away the moment its last seat is taken, whatever the others do.
   void _boardOneByOne(LaneDelta delta) {
-    final steps = <(int busId, int color)>[
-      for (final slot in delta.boardedSlots)
-        for (var i = 0; i < (delta.boardCounts[slot] ?? 0); i++)
-          (delta.before[slot]!.id, delta.before[slot]!.colorIndex),
-    ];
+    final steps = delta.boardingOrder;
     final stride = _strideFor(steps.length);
     for (var i = 0; i < steps.length; i++) {
-      final (busId, color) = steps[i];
-      _runAfter(stride * i, () => _sendPassenger(busId, color));
+      final step = steps[i];
+      _runAfter(stride * i, () => _sendPassenger(step.busId, step.color));
     }
   }
 
@@ -414,7 +410,12 @@ class BusEscapeGame extends FlameGame {
     if (!canSort || !session.sort()) return false;
     final after = session.state;
     final events = eventsForSort(before, after);
-    final delta = laneDelta(before, after, null);
+    final delta = laneDelta(
+      before,
+      after,
+      null,
+      queue: Rules.sortedQueue(before),
+    );
 
     resultDelay = _resultDelayFor(after.status, events, delta, 0, 0);
     feedback?.emit(GameEvent.booster);

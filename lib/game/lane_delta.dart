@@ -17,6 +17,7 @@ class LaneDelta {
     required this.boardedSlots,
     required this.departed,
     this.boardCounts = const {},
+    this.boardingOrder = const [],
   });
 
   /// Slot the exiting bus parked in.
@@ -31,11 +32,22 @@ class LaneDelta {
 
   /// Passengers who boarded, per slot.
   final Map<int, int> boardCounts;
+
+  /// Who boards which vehicle, in the order the passengers leave the queue.
+  final List<({int busId, int color})> boardingOrder;
 }
 
 /// [exited] is the vehicle that just left the jam, or null when nothing
 /// parked (the Sort booster); then [LaneDelta.slot] is -1.
-LaneDelta laneDelta(GameState before, GameState after, Bus? exited) {
+///
+/// [queue] is the queue boarding starts from; it defaults to the queue
+/// before the move (the Sort booster reorders it first).
+LaneDelta laneDelta(
+  GameState before,
+  GameState after,
+  Bus? exited, {
+  List<int>? queue,
+}) {
   final parked = [...before.lane];
   var slot = -1;
   if (exited != null) {
@@ -45,6 +57,19 @@ LaneDelta laneDelta(GameState before, GameState after, Bus? exited) {
       colorIndex: exited.colorIndex,
       capacity: exited.capacity,
     );
+  }
+
+  // Replays boarding: each passenger takes the leftmost matching vehicle
+  // with a free seat, until the front of the queue matches nothing.
+  final free = [for (final p in parked) p == null ? 0 : p.capacity - p.boarded];
+  final order = <({int busId, int color})>[];
+  for (final color in queue ?? before.queue) {
+    final i = [for (var k = 0; k < parked.length; k++) k].indexWhere(
+      (k) => parked[k] != null && parked[k]!.colorIndex == color && free[k] > 0,
+    );
+    if (i < 0) break;
+    free[i]--;
+    order.add((busId: parked[i]!.id, color: color));
   }
 
   final boarded = <int>[];
@@ -69,5 +94,6 @@ LaneDelta laneDelta(GameState before, GameState after, Bus? exited) {
     boardedSlots: boarded,
     departed: departed,
     boardCounts: counts,
+    boardingOrder: order,
   );
 }

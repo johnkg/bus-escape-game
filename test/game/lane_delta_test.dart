@@ -84,4 +84,17 @@ void main() {
     expect(d.before[0]?.boarded, 0);
     expect(eventsForSort(s, after), [GameEvent.board, GameEvent.depart]);
   });
+
+  test('passengers board in queue order, not in vehicle order', () {
+    // Vehicle 0 (colour 0) is parked first; the queue starts with colour 1.
+    var s = start([bus(0, 0, 0), bus(1, 1, 1)], [1, 0, 1, 0]);
+    s = Rules.tap(s, 0).state;
+    final d = tap(s, 1);
+    expect(d.boardingOrder.map((e) => (e.busId, e.color)), [
+      (1, 1),
+      (0, 0),
+      (1, 1),
+      (0, 0),
+    ]);
+  });
 }

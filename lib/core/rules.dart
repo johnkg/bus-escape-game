@@ -61,9 +61,10 @@ class Rules {
     return TapResult(next.copyWith(status: evaluate(next)), moved: true);
   }
 
-  /// The Sort booster: passengers whose color matches a parked vehicle with
-  /// free seats jump the queue and board it. Null if nobody can be helped.
-  static GameState? sortQueue(GameState s) {
+  /// The queue as the Sort booster leaves it before boarding: passengers
+  /// matching a parked vehicle with free seats move to the front. Null if
+  /// nobody can be helped.
+  static List<int>? sortedQueue(GameState s) {
     if (s.status != GameStatus.playing) return null;
     final pulled = <int>[];
     final rest = [...s.queue];
@@ -79,8 +80,15 @@ class Rules {
         }
       }
     }
-    if (pulled.isEmpty) return null;
-    final next = board(s.copyWith(queue: [...pulled, ...rest]));
+    return pulled.isEmpty ? null : [...pulled, ...rest];
+  }
+
+  /// The Sort booster: passengers whose color matches a parked vehicle with
+  /// free seats jump the queue and board it. Null if nobody can be helped.
+  static GameState? sortQueue(GameState s) {
+    final queue = sortedQueue(s);
+    if (queue == null) return null;
+    final next = board(s.copyWith(queue: queue));
     return next.copyWith(status: evaluate(next));
   }
 
