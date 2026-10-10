@@ -174,7 +174,8 @@ void boosterTests() {
       }
       expect(game.session.state.status, GameStatus.won);
       expect(game.session.stars, 1); // help used
-      await runFor(tester, 3); // let the result dialog timer finish
+      // Passengers now board one by one, so the result dialog waits longer.
+      await runFor(tester, 6); // let the result dialog timer finish
     });
 
     testWidgets('hint button does nothing at zero hints', (tester) async {

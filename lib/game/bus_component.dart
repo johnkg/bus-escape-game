@@ -37,6 +37,11 @@ class BusComponent extends PositionComponent
   void update(double dt) {
     if (_hintLeft > 0) _hintLeft = max(0, _hintLeft - dt);
     if (_route != null) _stepFlight(dt);
+    final lift = _liftSlot;
+    if (lift != null && _gate!()) {
+      _liftSlot = null;
+      _startLift(lift);
+    }
   }
 
   @override
@@ -73,10 +78,23 @@ class BusComponent extends PositionComponent
   static const double liftSeconds = 0.55;
 
   /// Clear booster: carried straight to the lane slot, over everything.
-  void liftToLane(int slot, VoidCallback onArrived) {
+  void liftToLane(int slot, VoidCallback onArrived, bool Function() gate) {
+    _gate = gate;
+    _onArrived = onArrived;
+    priority = 200;
+    _liftSlot = slot; // takes off once the bay is free
+  }
+
+  int? _liftSlot;
+
+  /// True once the vehicle may pull into its bay (the last one has left).
+  bool Function()? _gate;
+
+  void _startLift(int slot) {
+    final onArrived = _onArrived!;
+    _onArrived = null;
     final c = game.layout.laneSlotRect(slot).center;
     final target = Vector2(c.dx, c.dy) - size / 2;
-    priority = 200;
     add(
       MoveEffect.to(
         target,
@@ -140,7 +158,8 @@ class BusComponent extends PositionComponent
   }
 
   /// Drive out, along the road and into the bay.
-  void exitToLane(int slot, VoidCallback onArrived) {
+  void exitToLane(int slot, VoidCallback onArrived, bool Function() gate) {
+    _gate = gate;
     final route = _routeTo(slot);
     priority = 200; // fly above everything else
     anchor = Anchor.center;
@@ -154,7 +173,17 @@ class BusComponent extends PositionComponent
 
   void _stepFlight(double dt) {
     final route = _route!;
-    _flightT += dt;
+    var t = _flightT + dt;
+    // Wait at the kerb, short of the last stretch, while the bay is taken.
+    if (!_gate!()) {
+      final total = _routeLength(route);
+      final last = route.last.distanceTo(route[route.length - 2]);
+      final reach = Curves.easeInOutSine.transform(
+        (t / _flightDuration).clamp(0.0, 1.0),
+      );
+      if (reach * total > total - last) t = _flightT;
+    }
+    _flightT = t;
     final p = (_flightT / _flightDuration).clamp(0.0, 1.0);
     final eased = Curves.easeInOutSine.transform(p);
     var left = eased * _routeLength(route);

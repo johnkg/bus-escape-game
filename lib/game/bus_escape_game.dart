@@ -8,6 +8,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/foundation.dart';
 
 import '../services/feedback_service.dart';
+import 'boarding_passenger.dart';
 import 'bus_component.dart';
 import 'confetti.dart';
 import 'departing_bus.dart';
@@ -81,6 +82,39 @@ class BusEscapeGame extends FlameGame {
   final List<TimerComponent> _pending = [];
   final Random _rng = Random();
 
+  /// Queue as drawn while passengers are still walking to their vehicle;
+  /// null means draw the real queue.
+  List<int>? queueShown;
+  int _boardingRuns = 0;
+
+  /// Slot -> id of the vehicle that holds it visually, from the moment it
+  /// is assigned until its bus has driven off. Later vehicles for the same
+  /// slot queue up in [_slotWaiting] instead of overlapping it.
+  final Map<int, int> _slotOwner = {};
+  final Map<int, List<int>> _slotWaiting = {};
+
+  /// Whether vehicle [id] may pull into [slot] yet.
+  bool mayEnter(int slot, int id) => _slotOwner[slot] == id;
+
+  /// Returns true if [id] got the slot straight away.
+  bool _claimSlot(int slot, int id) {
+    if (_slotOwner[slot] == null) {
+      _slotOwner[slot] = id;
+      return true;
+    }
+    (_slotWaiting[slot] ??= []).add(id);
+    return false;
+  }
+
+  void _freeSlot(int slot) {
+    _slotOwner.remove(slot);
+    final waiting = _slotWaiting[slot];
+    if (waiting != null && waiting.isNotEmpty) {
+      _slotOwner[slot] = waiting.removeAt(0);
+      _lane.hidden.add(slot);
+    }
+  }
+
   @override
   Color backgroundColor() => pavementColor;
 
@@ -131,8 +165,13 @@ class BusEscapeGame extends FlameGame {
     }
     _pending.clear();
     _lane.reset();
+    _slotOwner.clear();
+    _slotWaiting.clear();
+    queueShown = null;
+    _boardingRuns = 0;
     for (final c in [
       ...world.children.whereType<DepartingBus>(),
+      ...world.children.whereType<BoardingPassenger>(),
       ...world.children.whereType<ParticleSystemComponent>(),
     ]) {
       c.removeFromParent();
@@ -164,24 +203,77 @@ class BusEscapeGame extends FlameGame {
   /// Seconds between the staggered after-arrival effects.
   static const double _beat = 0.25;
 
+  /// Seconds between passengers setting off, and the whole boarding run.
+  static const double _stride = 0.16;
+
+  double _strideFor(int total) => total <= 1 ? 0 : min(_stride, 1.0 / total);
+
+  double _boardSeconds(LaneDelta delta) {
+    final total = delta.boardCounts.values.fold(0, (a, b) => a + b);
+    if (total == 0) return 0;
+    return _strideFor(total) * (total - 1) + BoardingPassenger.duration;
+  }
+
+  /// Walks the passengers into their vehicles one at a time.
+  void _boardOneByOne(LaneDelta delta) {
+    final steps = <(int slot, int color)>[
+      for (final slot in delta.boardedSlots)
+        for (var i = 0; i < (delta.boardCounts[slot] ?? 0); i++)
+          (slot, delta.before[slot]!.colorIndex),
+    ];
+    final stride = _strideFor(steps.length);
+    final seated = <int, int>{
+      for (final slot in delta.boardedSlots) slot: delta.before[slot]!.boarded,
+    };
+    for (var i = 0; i < steps.length; i++) {
+      final (slot, color) = steps[i];
+      _runAfter(stride * i, () {
+        final shown = queueShown;
+        var idx = shown?.indexOf(color) ?? -1;
+        if (idx >= 0) shown!.removeAt(idx);
+        idx = idx < 0 ? 0 : min(idx, GameLayout.queueVisible - 1);
+        final bay = layout.laneSlotRect(slot);
+        world.add(
+          BoardingPassenger(
+            from: layout.queuePoint(idx),
+            to: Offset(bay.center.dx, bay.bottom - 22),
+            colorIndex: color,
+            onArrived: () {
+              final n = seated[slot] = seated[slot]! + 1;
+              final held = _lane.holding[slot];
+              if (held != null) _lane.holding[slot] = held.withBoarded(n);
+              _lane.hop(slot);
+            },
+          ),
+        );
+      });
+    }
+    _runAfter(_boardSeconds(delta), () {
+      for (final slot in delta.boardedSlots) {
+        if (!delta.departed.any((d) => d.slot == slot)) {
+          _lane.holding.remove(slot); // show the real passenger count
+        }
+      }
+      _endBoardingRun();
+    });
+  }
+
+  void _endBoardingRun() {
+    if (_boardingRuns > 0 && --_boardingRuns == 0) queueShown = null;
+  }
+
   /// Plays one post-arrival event: its sound/haptic plus its visual.
   void _playEvent(GameEvent event, LaneDelta delta) {
     feedback?.emit(event);
     switch (event) {
       case GameEvent.board:
-        for (final slot in delta.boardedSlots) {
-          final leaving = delta.departed.where((d) => d.slot == slot);
-          if (leaving.isEmpty) {
-            _lane.holding.remove(slot); // reveal the new passenger count
-          } else {
-            _lane.holding[slot] = leaving.first.bus; // full, about to leave
-          }
-          _lane.hop(slot);
-        }
+        _boardOneByOne(delta);
       case GameEvent.depart:
         for (final d in delta.departed) {
           _lane.holding.remove(d.slot);
           world.add(DepartingBus(slot: d.slot, bus: d.bus));
+          // Let the leaving bus clear the bay before the next one pulls in.
+          _runAfter(0.25, () => _freeSlot(d.slot));
         }
       case GameEvent.win:
         confettiBursts++;
@@ -294,8 +386,9 @@ class BusEscapeGame extends FlameGame {
     final events = eventsForSort(before, after);
     final delta = laneDelta(before, after, null);
 
-    resultDelay = _resultDelayFor(after.status, events.length - 1, 0);
+    resultDelay = _resultDelayFor(after.status, events, delta, 0, 0);
     feedback?.emit(GameEvent.booster);
+    _beginBoardingRun(before, events);
     for (final slot in delta.boardedSlots) {
       _lane.holding[slot] = delta.before[slot]!;
     }
@@ -304,10 +397,34 @@ class BusEscapeGame extends FlameGame {
     return true;
   }
 
+  /// Keeps the queue looking untouched until the passengers walk off it.
+  void _beginBoardingRun(GameState before, List<GameEvent> events) {
+    _boardingRuns++;
+    queueShown ??= [...before.queue];
+    if (!events.contains(GameEvent.board)) _endBoardingRun();
+  }
+
+  /// Start time of each event from [from] on, relative to the first one.
+  List<double> _eventOffsets(
+    List<GameEvent> events,
+    LaneDelta delta,
+    int from,
+  ) {
+    final out = <double>[];
+    var t = 0.0;
+    for (var i = from; i < events.length; i++) {
+      out.add(t);
+      t += events[i] == GameEvent.board ? _boardSeconds(delta) + 0.12 : _beat;
+    }
+    return out;
+  }
+
   /// How long after a move the result dialog should wait.
   Duration _resultDelayFor(
     GameStatus status,
-    int staggeredEvents,
+    List<GameEvent> events,
+    LaneDelta delta,
+    int from,
     double lead,
   ) {
     final tail = switch (status) {
@@ -315,10 +432,9 @@ class BusEscapeGame extends FlameGame {
       GameStatus.lost => 0.8,
       GameStatus.playing => 0.0,
     };
-    return Duration(
-      milliseconds: ((lead + _beat * max(0, staggeredEvents - 1) + tail) * 1000)
-          .round(),
-    );
+    final offsets = _eventOffsets(events, delta, from);
+    final last = offsets.isEmpty ? 0.0 : offsets.last;
+    return Duration(milliseconds: ((lead + last + tail) * 1000).round());
   }
 
   void _scheduleEvents(
@@ -326,8 +442,9 @@ class BusEscapeGame extends FlameGame {
     LaneDelta delta, {
     int from = 1,
   }) {
+    final offsets = _eventOffsets(events, delta, from);
     for (var i = from; i < events.length; i++) {
-      _runAfter(_beat * (i - from), () => _playEvent(events[i], delta));
+      _runAfter(offsets[i - from], () => _playEvent(events[i], delta));
     }
   }
 
@@ -354,28 +471,41 @@ class BusEscapeGame extends FlameGame {
     final after = session.state;
     final events = eventsForMove(before, after);
     final delta = laneDelta(before, after, comp.bus);
-    final flight = airlift ? BusComponent.liftSeconds : comp.flightSeconds(delta.slot);
+    final flight = airlift
+        ? BusComponent.liftSeconds
+        : comp.flightSeconds(delta.slot);
+
+    final slot = delta.slot;
+    final immediate = _claimSlot(slot, id);
+    // A vehicle queued behind one that is still leaving arrives later.
+    final wait = immediate ? 0.0 : 1.2;
 
     // Time the result dialog to land after the last animation.
-    resultDelay = _resultDelayFor(after.status, events.length - 1, flight);
+    resultDelay = _resultDelayFor(after.status, events, delta, 1, flight + wait);
 
     feedback?.emit(events.first);
+    _beginBoardingRun(before, events);
     // Until the bus arrives and the animation says so, keep the lane
-    // looking the way it did before this move's boarding.
-    for (final slot in delta.boardedSlots) {
-      _lane.holding[slot] = delta.before[slot]!;
+    // looking the way it did before this move's boarding. The new bus's
+    // own bay is set up on arrival: it may still show the previous bus.
+    for (final s in delta.boardedSlots) {
+      if (s != slot) _lane.holding[s] = delta.before[s]!;
     }
-    _lane.hidden.add(delta.slot);
+    if (immediate) _lane.hidden.add(slot);
     _buses.remove(id);
     stateNotifier.value = after;
     void arrived() {
-      _lane.hidden.remove(delta.slot);
+      _lane.hidden.remove(slot);
       comp.removeFromParent();
+      if (delta.boardedSlots.contains(slot)) {
+        _lane.holding[slot] = delta.before[slot]!;
+      }
       _scheduleEvents(events, delta);
     }
 
+    bool gate() => mayEnter(slot, id);
     airlift
-        ? comp.liftToLane(delta.slot, arrived)
-        : comp.exitToLane(delta.slot, arrived);
+        ? comp.liftToLane(slot, arrived, gate)
+        : comp.exitToLane(slot, arrived, gate);
   }
 }
