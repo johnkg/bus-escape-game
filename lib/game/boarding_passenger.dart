@@ -3,7 +3,6 @@ import 'dart:ui';
 
 import 'package:flame/components.dart';
 import 'package:flutter/animation.dart';
-import 'package:flutter/foundation.dart' show VoidCallback;
 
 import 'bus_escape_game.dart';
 import 'palette.dart';
