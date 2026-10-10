@@ -130,6 +130,85 @@ void main() {
       }
     });
 
+    test('only sedans, coaster buses and buses; services keep their kind', () {
+      var police = 0, fire = 0, buses = 0;
+      for (var n = 1; n <= 80; n++) {
+        for (final b in gen(n).buses) {
+          expect([2, 3, 5], contains(b.length), reason: 'level $n');
+          if (b.colorIndex == policeColor) {
+            police++;
+            expect(b.length, 2, reason: 'police car is a sedan (level $n)');
+          } else if (b.colorIndex == fireColor) {
+            fire++;
+            expect(b.length, 3, reason: 'fire truck is 6 seats (level $n)');
+          } else {
+            expect(b.colorIndex, lessThan(6), reason: 'level $n');
+          }
+          if (b.length == 5) buses++;
+        }
+      }
+      expect(police, greaterThan(0));
+      expect(fire, greaterThan(0));
+      expect(buses, greaterThan(0));
+    });
+
+    test('police and fire only turn up on higher levels', () {
+      for (var n = 1; n < 12; n++) {
+        expect(
+          gen(n).buses.any((b) => isServiceColor(b.colorIndex)),
+          isFalse,
+          reason: 'level $n',
+        );
+      }
+      for (var n = 1; n < 20; n++) {
+        expect(
+          gen(n).buses.any((b) => b.colorIndex == fireColor),
+          isFalse,
+          reason: 'level $n',
+        );
+      }
+    });
+
+    test('service passengers only board their own vehicle', () {
+      const sedan = ParkedBus(id: 0, colorIndex: 0, capacity: 4);
+      const police = ParkedBus(id: 1, colorIndex: policeColor, capacity: 4);
+      GameState state(List<ParkedBus?> lane, List<int> queue) => GameState(
+        rows: 2,
+        cols: 2,
+        buses: const [],
+        lane: lane,
+        queue: queue,
+      );
+
+      // A police officer will not take a seat in an ordinary sedan.
+      var s = Rules.board(state([sedan], [policeColor]));
+      expect(s.lane[0]!.boarded, 0);
+      expect(s.queue, [policeColor]);
+
+      // ...but boards the police car, even when it is parked further along.
+      s = Rules.board(state([sedan, police], [policeColor]));
+      expect(s.lane[0]!.boarded, 0);
+      expect(s.lane[1]!.boarded, 1);
+      expect(s.queue, isEmpty);
+    });
+
+    test('vehicle kinds follow length and color', () {
+      expect(
+        VehicleKind.of(length: 2, colorIndex: 1),
+        VehicleKind.sedan,
+      );
+      expect(VehicleKind.of(length: 3, colorIndex: 4), VehicleKind.coaster);
+      expect(VehicleKind.of(length: 5, colorIndex: 0), VehicleKind.bus);
+      expect(
+        VehicleKind.of(length: 2, colorIndex: policeColor),
+        VehicleKind.policeCar,
+      );
+      expect(
+        VehicleKind.of(length: 3, colorIndex: fireColor),
+        VehicleKind.fireTruck,
+      );
+    });
+
     test('passenger count equals total seats', () {
       for (var n = 1; n <= 80; n++) {
         final level = gen(n);

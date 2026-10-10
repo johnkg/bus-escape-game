@@ -5,7 +5,6 @@ import 'package:flame/components.dart';
 import 'package:flutter/animation.dart';
 
 import 'bus_escape_game.dart';
-import 'palette.dart';
 import 'symbols.dart';
 import 'vehicle_painter.dart';
 
@@ -46,8 +45,7 @@ class BoardingPassenger extends PositionComponent
     final p = Curves.easeInOutSine.transform(u);
     final pos = Offset.lerp(from, to, p)!.translate(0, -sin(pi * p) * 10);
     final scale = 1 + (toScale - 1) * p;
-    final color = busColors[colorIndex % busColors.length];
-    paintPerson(canvas, pos, color, scale: scale);
+    paintPassenger(canvas, pos, colorIndex, scale: scale);
     if (game.showSymbols && u < 0.8) {
       paintSymbol(canvas, pos.translate(0, 4), 8, symbolFor(colorIndex));
     }

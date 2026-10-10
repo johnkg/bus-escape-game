@@ -6,6 +6,7 @@ import 'game_state.dart';
 import 'level.dart';
 import 'rng.dart';
 import 'rules.dart';
+import 'vehicle_kind.dart';
 
 class LevelConfig {
   const LevelConfig({
@@ -18,6 +19,9 @@ class LevelConfig {
     required this.mix,
     required this.busChance,
     required this.irregular,
+    this.longBusChance = 0,
+    this.policeChance = 0,
+    this.fireChance = 0,
   });
 
   final int rows;
@@ -34,8 +38,16 @@ class LevelConfig {
   /// vehicles that are still stuck in the jam, so the lane fills up.
   final double mix;
 
-  /// Chance a vehicle is a 3-cell bus rather than a 2-cell car.
+  /// Chance a vehicle is a 3-cell coaster rather than a 2-cell sedan.
   final double busChance;
+
+  /// Chance a vehicle is a 5-cell, 10-seat bus.
+  final double longBusChance;
+
+  /// Chances a vehicle is a police car (4 seats, police passengers only) or
+  /// a fire truck (6 seats, firefighters only).
+  final double policeChance;
+  final double fireChance;
 
   /// Whether the lot gets a non-rectangular outline.
   final bool irregular;
@@ -68,6 +80,9 @@ class LevelGenerator {
       mix: (0.15 + n * 0.012).clamp(0.15, 0.7),
       busChance: (0.3 + n * 0.005).clamp(0.3, 0.45),
       irregular: n >= 3,
+      longBusChance: n >= 4 ? (0.06 + n * 0.002).clamp(0.06, 0.14) : 0,
+      policeChance: n >= 12 ? (0.04 + (n - 12) * 0.004).clamp(0.04, 0.12) : 0,
+      fireChance: n >= 20 ? (0.04 + (n - 20) * 0.004).clamp(0.04, 0.1) : 0,
     );
   }
 
@@ -140,13 +155,24 @@ class LevelGenerator {
         occupied.length < lotCells * c.fill) {
       Bus? found;
       for (var t = 0; t < 250 && found == null; t++) {
-        final length = rng.chance(c.busChance) ? 3 : 2;
+        var length = rng.chance(c.busChance) ? 3 : 2;
+        if (c.longBusChance > 0 && rng.chance(c.longBusChance)) length = 5;
+        // Services are a 4-seat police car or a 6-seat fire truck; their
+        // passengers only board their own vehicle.
+        var service = -1;
+        if (c.fireChance > 0 && rng.chance(c.fireChance)) {
+          service = fireColor;
+          length = 3;
+        } else if (c.policeChance > 0 && rng.chance(c.policeChance)) {
+          service = policeColor;
+          length = 2;
+        }
         final dir = Direction.values[rng.nextInt(4)];
         final maxRow = dir.isHorizontal ? c.rows : c.rows - length + 1;
         final maxCol = dir.isHorizontal ? c.cols - length + 1 : c.cols;
         final bus = Bus(
           id: placed.length,
-          colorIndex: rng.nextInt(c.colorCount),
+          colorIndex: service >= 0 ? service : rng.nextInt(c.colorCount),
           row: rng.nextInt(maxRow),
           col: rng.nextInt(maxCol),
           length: length,
