@@ -82,36 +82,102 @@ class BusEscapeGame extends FlameGame {
   final List<TimerComponent> _pending = [];
   final Random _rng = Random();
 
-  /// Queue as drawn while passengers are still walking to their vehicle;
-  /// null means draw the real queue.
-  List<int>? queueShown;
-  int _boardingRuns = 0;
+  late final QueueView _queue = QueueView(layout);
 
-  /// Slot -> id of the vehicle that holds it visually, from the moment it
-  /// is assigned until its bus has driven off. Later vehicles for the same
-  /// slot queue up in [_slotWaiting] instead of overlapping it.
-  final Map<int, int> _slotOwner = {};
-  final Map<int, List<int>> _slotWaiting = {};
+  /// Bay -> id of the vehicle using it, from the moment it is assigned until
+  /// it has pulled away. Bays are visual: a vehicle parks in the next free
+  /// open bay, which need not be the slot core state numbered it.
+  final Map<int, int> _bayOcc = {};
+  final Map<int, int> _bayOfBus = {};
 
-  /// Whether vehicle [id] may pull into [slot] yet.
-  bool mayEnter(int slot, int id) => _slotOwner[slot] == id;
+  /// Vehicles that had to wait for a bay that is still emptying, per bay.
+  final Map<int, List<int>> _bayWaiting = {};
 
-  /// Returns true if [id] got the slot straight away.
-  bool _claimSlot(int slot, int id) {
-    if (_slotOwner[slot] == null) {
-      _slotOwner[slot] = id;
+  /// Passengers on their way to a vehicle's seats, per bay.
+  final Map<int, int> _inFlight = {};
+
+  /// Vehicles sent off early; their remaining passengers were already
+  /// taken off the queue, so later boarding steps for them are skipped.
+  final Set<int> _sentOff = {};
+
+  /// Whether vehicle [id] may pull into [bay] yet.
+  bool mayEnter(int bay, int id) => _bayOcc[bay] == id;
+
+  void _syncBays() {
+    _bayOcc.clear();
+    _bayOfBus.clear();
+    _bayWaiting.clear();
+    _inFlight.clear();
+    _sentOff.clear();
+    final lane = session.state.lane;
+    for (var i = 0; i < lane.length; i++) {
+      final p = lane[i];
+      if (p == null) continue;
+      _bayOcc[i] = p.id;
+      _bayOfBus[p.id] = i;
+    }
+    _lane.syncFrom(lane);
+    _queue.reset(session.state.queue);
+  }
+
+  /// The next open bay with nobody in it. Failing that, a bay whose vehicle
+  /// core state has already sent away (it is only still boarding on screen),
+  /// which [_sendOff] then clears at once so nobody has to wait.
+  int _pickBay(int preferred, GameState after) {
+    final inLane = {
+      for (final p in after.lane)
+        if (p != null) p.id,
+    };
+    final open = [for (var b = 0; b < layout.laneSlots; b++) b];
+    final free = open.where((b) => !_bayOcc.containsKey(b)).toList();
+    if (free.isNotEmpty) {
+      return free.contains(preferred) ? preferred : free.first;
+    }
+    final leaving = open.where((b) => !inLane.contains(_bayOcc[b])).toList();
+    for (final b in leaving) {
+      if (_lane.bays[b]?.id == _bayOcc[b]) return b; // parked: can go now
+    }
+    return leaving.isNotEmpty ? leaving.first : preferred;
+  }
+
+  /// Seats a leaving vehicle's remaining passengers at once and drives it
+  /// off, freeing its bay immediately.
+  void _sendOff(int bay) {
+    final id = _bayOcc[bay];
+    final parked = _lane.bays[bay];
+    if (id == null || parked == null || parked.id != id) return;
+    final remaining = parked.capacity - parked.boarded - (_inFlight[bay] ?? 0);
+    for (var i = 0; i < remaining; i++) {
+      _queue.take(parked.colorIndex);
+    }
+    _sentOff.add(id);
+    _inFlight[bay] = 0;
+    _depart(bay, parked.withBoarded(parked.capacity));
+    _freeBay(bay);
+  }
+
+  void _depart(int bay, ParkedBus full) {
+    _lane.bays.remove(bay);
+    _bayOfBus.remove(full.id);
+    feedback?.emit(GameEvent.depart);
+    world.add(DepartingBus(slot: bay, bus: full));
+  }
+
+  /// Returns true if [id] got [bay] straight away.
+  bool _claimBay(int bay, int id) {
+    if (_bayOcc[bay] == null) {
+      _bayOcc[bay] = id;
       return true;
     }
-    (_slotWaiting[slot] ??= []).add(id);
+    (_bayWaiting[bay] ??= []).add(id);
     return false;
   }
 
-  void _freeSlot(int slot) {
-    _slotOwner.remove(slot);
-    final waiting = _slotWaiting[slot];
+  void _freeBay(int bay) {
+    _bayOcc.remove(bay);
+    final waiting = _bayWaiting[bay];
     if (waiting != null && waiting.isNotEmpty) {
-      _slotOwner[slot] = waiting.removeAt(0);
-      _lane.hidden.add(slot);
+      _bayOcc[bay] = waiting.removeAt(0);
     }
   }
 
@@ -121,7 +187,8 @@ class BusEscapeGame extends FlameGame {
   @override
   Future<void> onLoad() async {
     camera.viewfinder.anchor = Anchor.topLeft;
-    world.addAll([SceneView(), _lane, QueueView()]);
+    world.addAll([SceneView(), _lane, _queue]);
+    _syncBays();
     _spawnBuses();
     _syncLockedButtons();
   }
@@ -153,6 +220,7 @@ class BusEscapeGame extends FlameGame {
     layout.laneSlots = session.state.lane.length;
     layout.lockedSlots = GameSession.maxExtraSlots - session.extraSlots;
     clearArmed.value = false;
+    _syncBays();
     _spawnBuses();
     _syncLockedButtons();
     stateNotifier.value = session.state;
@@ -165,10 +233,6 @@ class BusEscapeGame extends FlameGame {
     }
     _pending.clear();
     _lane.reset();
-    _slotOwner.clear();
-    _slotWaiting.clear();
-    queueShown = null;
-    _boardingRuns = 0;
     for (final c in [
       ...world.children.whereType<DepartingBus>(),
       ...world.children.whereType<BoardingPassenger>(),
@@ -203,78 +267,71 @@ class BusEscapeGame extends FlameGame {
   /// Seconds between the staggered after-arrival effects.
   static const double _beat = 0.25;
 
-  /// Seconds between passengers setting off, and the whole boarding run.
-  static const double _stride = 0.16;
+  /// Seconds between passengers setting off.
+  static const double _stride = 0.12;
 
-  double _strideFor(int total) => total <= 1 ? 0 : min(_stride, 1.0 / total);
+  double _strideFor(int total) => total <= 1 ? 0 : min(_stride, 0.9 / total);
 
   double _boardSeconds(LaneDelta delta) {
-    final total = delta.boardCounts.values.fold(0, (a, b) => a + b);
+    final total = delta.boardingOrder.length;
     if (total == 0) return 0;
     return _strideFor(total) * (total - 1) + BoardingPassenger.duration;
   }
 
-  /// Walks the passengers into their vehicles one at a time.
+  /// Walks the passengers into their vehicles one at a time. A vehicle
+  /// pulls away the moment its last seat is taken, whatever the others do.
   void _boardOneByOne(LaneDelta delta) {
-    final steps = <(int slot, int color)>[
-      for (final slot in delta.boardedSlots)
-        for (var i = 0; i < (delta.boardCounts[slot] ?? 0); i++)
-          (slot, delta.before[slot]!.colorIndex),
-    ];
+    final steps = delta.boardingOrder;
     final stride = _strideFor(steps.length);
-    final seated = <int, int>{
-      for (final slot in delta.boardedSlots) slot: delta.before[slot]!.boarded,
-    };
     for (var i = 0; i < steps.length; i++) {
-      final (slot, color) = steps[i];
-      _runAfter(stride * i, () {
-        final shown = queueShown;
-        var idx = shown?.indexOf(color) ?? -1;
-        if (idx >= 0) shown!.removeAt(idx);
-        idx = idx < 0 ? 0 : min(idx, GameLayout.queueVisible - 1);
-        final bay = layout.laneSlotRect(slot);
-        world.add(
-          BoardingPassenger(
-            from: layout.queuePoint(idx),
-            to: Offset(bay.center.dx, bay.bottom - 22),
-            colorIndex: color,
-            onArrived: () {
-              final n = seated[slot] = seated[slot]! + 1;
-              final held = _lane.holding[slot];
-              if (held != null) _lane.holding[slot] = held.withBoarded(n);
-              _lane.hop(slot);
-            },
-          ),
-        );
-      });
+      final step = steps[i];
+      _runAfter(stride * i, () => _sendPassenger(step.busId, step.color));
     }
-    _runAfter(_boardSeconds(delta), () {
-      for (final slot in delta.boardedSlots) {
-        if (!delta.departed.any((d) => d.slot == slot)) {
-          _lane.holding.remove(slot); // show the real passenger count
-        }
-      }
-      _endBoardingRun();
-    });
   }
 
-  void _endBoardingRun() {
-    if (_boardingRuns > 0 && --_boardingRuns == 0) queueShown = null;
+  void _sendPassenger(int busId, int color) {
+    if (_sentOff.contains(busId)) return;
+    final bay = _bayOfBus[busId];
+    final parked = bay == null ? null : _lane.bays[bay];
+    if (bay == null || parked == null || parked.id != busId) return;
+    final seatNo = parked.boarded + (_inFlight[bay] ?? 0);
+    _inFlight[bay] = (_inFlight[bay] ?? 0) + 1;
+    final seat = laneSeat(layout.laneSlotRect(bay), parked, seatNo);
+    world.add(
+      BoardingPassenger(
+        from: _queue.take(color) ?? layout.queuePoint(0),
+        to: seat.center,
+        toScale: seat.scale,
+        colorIndex: color,
+        onArrived: () => _passengerSeated(bay, busId),
+      ),
+    );
+  }
+
+  void _passengerSeated(int bay, int busId) {
+    final parked = _lane.bays[bay];
+    if (parked == null || parked.id != busId) return;
+    _inFlight[bay] = max(0, (_inFlight[bay] ?? 1) - 1);
+    final now = parked.withBoarded(parked.boarded + 1);
+    if (!now.isFull) {
+      _lane.bays[bay] = now;
+      _lane.hop(bay);
+      return;
+    }
+    // Full: off it goes, and the bay is free for the next vehicle.
+    _depart(bay, now);
+    _runAfter(0.3, () => _freeBay(bay));
   }
 
   /// Plays one post-arrival event: its sound/haptic plus its visual.
   void _playEvent(GameEvent event, LaneDelta delta) {
-    feedback?.emit(event);
+    // Departures are played by the vehicles themselves, as each one fills.
+    if (event != GameEvent.depart) feedback?.emit(event);
     switch (event) {
       case GameEvent.board:
         _boardOneByOne(delta);
       case GameEvent.depart:
-        for (final d in delta.departed) {
-          _lane.holding.remove(d.slot);
-          world.add(DepartingBus(slot: d.slot, bus: d.bus));
-          // Let the leaving bus clear the bay before the next one pulls in.
-          _runAfter(0.25, () => _freeSlot(d.slot));
-        }
+        break;
       case GameEvent.win:
         confettiBursts++;
         world.addAll(buildConfetti(_rng));
@@ -384,24 +441,18 @@ class BusEscapeGame extends FlameGame {
     if (!canSort || !session.sort()) return false;
     final after = session.state;
     final events = eventsForSort(before, after);
-    final delta = laneDelta(before, after, null);
+    final delta = laneDelta(
+      before,
+      after,
+      null,
+      queue: Rules.sortedQueue(before),
+    );
 
     resultDelay = _resultDelayFor(after.status, events, delta, 0, 0);
     feedback?.emit(GameEvent.booster);
-    _beginBoardingRun(before, events);
-    for (final slot in delta.boardedSlots) {
-      _lane.holding[slot] = delta.before[slot]!;
-    }
     stateNotifier.value = after;
     _scheduleEvents(events, delta, from: 0);
     return true;
-  }
-
-  /// Keeps the queue looking untouched until the passengers walk off it.
-  void _beginBoardingRun(GameState before, List<GameEvent> events) {
-    _boardingRuns++;
-    queueShown ??= [...before.queue];
-    if (!events.contains(GameEvent.board)) _endBoardingRun();
   }
 
   /// Start time of each event from [from] on, relative to the first one.
@@ -471,41 +522,34 @@ class BusEscapeGame extends FlameGame {
     final after = session.state;
     final events = eventsForMove(before, after);
     final delta = laneDelta(before, after, comp.bus);
+    final bay = _pickBay(delta.slot, after);
+    final occupant = _bayOcc[bay];
+    if (occupant != null && !after.lane.any((p) => p?.id == occupant)) {
+      _sendOff(bay); // it is leaving anyway; don't make this one wait
+    }
+    _bayOfBus[id] = bay;
+    final immediate = _claimBay(bay, id);
     final flight = airlift
         ? BusComponent.liftSeconds
-        : comp.flightSeconds(delta.slot);
-
-    final slot = delta.slot;
-    final immediate = _claimSlot(slot, id);
-    // A vehicle queued behind one that is still leaving arrives later.
+        : comp.flightSeconds(bay);
+    // A vehicle held back for a bay that is still emptying arrives later.
     final wait = immediate ? 0.0 : 1.2;
 
     // Time the result dialog to land after the last animation.
     resultDelay = _resultDelayFor(after.status, events, delta, 1, flight + wait);
 
     feedback?.emit(events.first);
-    _beginBoardingRun(before, events);
-    // Until the bus arrives and the animation says so, keep the lane
-    // looking the way it did before this move's boarding. The new bus's
-    // own bay is set up on arrival: it may still show the previous bus.
-    for (final s in delta.boardedSlots) {
-      if (s != slot) _lane.holding[s] = delta.before[s]!;
-    }
-    if (immediate) _lane.hidden.add(slot);
     _buses.remove(id);
     stateNotifier.value = after;
     void arrived() {
-      _lane.hidden.remove(slot);
       comp.removeFromParent();
-      if (delta.boardedSlots.contains(slot)) {
-        _lane.holding[slot] = delta.before[slot]!;
-      }
+      _lane.bays[bay] = delta.before[delta.slot]!;
       _scheduleEvents(events, delta);
     }
 
-    bool gate() => mayEnter(slot, id);
+    bool gate() => mayEnter(bay, id);
     airlift
-        ? comp.liftToLane(slot, arrived, gate)
-        : comp.exitToLane(slot, arrived, gate);
+        ? comp.liftToLane(bay, arrived, gate)
+        : comp.exitToLane(bay, arrived, gate);
   }
 }

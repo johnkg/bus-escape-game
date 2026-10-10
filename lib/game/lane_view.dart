@@ -17,24 +17,30 @@ import 'vehicle_painter.dart';
 class LaneView extends PositionComponent with HasGameReference<BusEscapeGame> {
   LaneView() : super(priority: 0);
 
-  static const double hopDuration = 0.28;
+  static const double hopDuration = 0.18;
 
-  /// Slots whose bus is still flying in: draw nothing there yet.
-  final Set<int> hidden = {};
+  /// What each bay shows right now. Driven by the animations rather than by
+  /// core state, so a vehicle appears when it parks, gains passengers as
+  /// they land, and leaves the moment its last seat is taken.
+  final Map<int, ParkedBus> bays = {};
 
-  /// Slots drawn from this snapshot instead of core state, so boarding and
-  /// departure show up when the animation says so, not when the tap happened.
-  final Map<int, ParkedBus> holding = {};
-
-  /// Remaining hop time per slot.
+  /// Remaining hop time per bay.
   final Map<int, double> hopT = {};
 
-  void hop(int slot) => hopT[slot] = hopDuration;
+  void hop(int bay) => hopT[bay] = hopDuration;
 
   void reset() {
-    hidden.clear();
-    holding.clear();
+    bays.clear();
     hopT.clear();
+  }
+
+  /// Shows the lane exactly as core state has it (start, undo, new slot).
+  void syncFrom(List<ParkedBus?> lane) {
+    reset();
+    for (var i = 0; i < lane.length; i++) {
+      final p = lane[i];
+      if (p != null) bays[i] = p;
+    }
   }
 
   @override
@@ -61,7 +67,6 @@ class LaneView extends PositionComponent with HasGameReference<BusEscapeGame> {
   void render(Canvas canvas) {
     final layout = game.layout;
     _paintRoad(canvas);
-    final lane = game.session.state.lane;
     for (var i = 0; i < layout.slotCount; i++) {
       final r = layout.laneSlotRect(i);
       if (i >= layout.laneSlots) {
@@ -69,13 +74,12 @@ class LaneView extends PositionComponent with HasGameReference<BusEscapeGame> {
         continue;
       }
       _paintBay(canvas, r);
-      if (hidden.contains(i)) continue;
-      final p = holding[i] ?? lane[i];
+      final p = bays[i];
       if (p == null) continue;
       final left = hopT[i];
       final lift = left == null
           ? 0.0
-          : -sin(pi * (1 - left / hopDuration)) * 10;
+          : -sin(pi * (1 - left / hopDuration)) * 4;
       canvas.save();
       canvas.translate(0, lift);
       paintLaneVehicle(canvas, r, p, symbols: game.showSymbols);
@@ -124,6 +128,42 @@ class LaneView extends PositionComponent with HasGameReference<BusEscapeGame> {
   }
 }
 
+typedef _LaneBody = ({Rect body, Rect glass, Rect cab});
+
+_LaneBody _laneBody(Rect slot, ParkedBus p) {
+  final length = p.capacity ~/ Bus.seatsPerCell;
+  final inner = slot.deflate(3);
+  final h = inner.height * (length <= 2 ? 0.72 : 1.0);
+  final body = Rect.fromLTWH(inner.left, inner.bottom - h, inner.width, h);
+  final glass = Rect.fromLTWH(
+    body.left + body.width * 0.16,
+    body.top + 3,
+    body.width * 0.68,
+    body.height * 0.1,
+  );
+  final cab = Rect.fromLTRB(
+    body.left + body.width * 0.11,
+    glass.bottom + 3,
+    body.right - body.width * 0.11,
+    body.bottom - 4,
+  );
+  return (body: body, glass: glass, cab: cab);
+}
+
+/// Where seat [index] of a parked vehicle is, and how big its passenger is.
+({Offset center, double scale}) laneSeat(Rect slot, ParkedBus p, int index) {
+  final cab = _laneBody(slot, p).cab;
+  final rows = (p.capacity / Bus.seatsPerCell).ceil();
+  final cw = cab.width / Bus.seatsPerCell;
+  final ch = cab.height / rows;
+  final seat = min(cw, ch) * 0.8;
+  final c = Offset(
+    cab.left + cw * (index % Bus.seatsPerCell + 0.5),
+    cab.top + ch * (index ~/ Bus.seatsPerCell + 0.5),
+  );
+  return (center: c.translate(0, -1), scale: seat / 20);
+}
+
 /// A parked vehicle seen from above, nose up, roof open so the seats show:
 /// empty seats are plain, boarded ones hold a passenger. Cars fill part of
 /// the slot, buses all of it.
@@ -133,11 +173,8 @@ void paintLaneVehicle(
   ParkedBus p, {
   bool symbols = false,
 }) {
-  final length = p.capacity ~/ Bus.seatsPerCell;
   final color = busColors[p.colorIndex % busColors.length];
-  final inner = slot.deflate(3);
-  final h = inner.height * (length <= 2 ? 0.72 : 1.0);
-  final body = Rect.fromLTWH(inner.left, inner.bottom - h, inner.width, h);
+  final (:body, :glass, :cab) = _laneBody(slot, p);
   final radius = Radius.circular(body.width * 0.28);
 
   canvas.drawRRect(
@@ -154,12 +191,6 @@ void paintLaneVehicle(
       ..color = shade(color, -0.25),
   );
 
-  final glass = Rect.fromLTWH(
-    body.left + body.width * 0.16,
-    body.top + 3,
-    body.width * 0.68,
-    body.height * 0.1,
-  );
   canvas.drawRRect(
     RRect.fromRectAndRadius(glass, const Radius.circular(3)),
     Paint()..color = const Color(0xE63A526B),
@@ -173,12 +204,6 @@ void paintLaneVehicle(
     );
   }
 
-  final cab = Rect.fromLTRB(
-    body.left + body.width * 0.11,
-    glass.bottom + 3,
-    body.right - body.width * 0.11,
-    body.bottom - 4,
-  );
   canvas.drawRRect(
     RRect.fromRectAndRadius(cab, const Radius.circular(4)),
     Paint()..color = const Color(0xFFF6EBD0),
