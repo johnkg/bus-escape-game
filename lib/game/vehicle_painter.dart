@@ -19,6 +19,8 @@ const Color _policeBlue = Color(0xFF2B4C9B);
 const Color _lightRed = Color(0xFFFF4A4A);
 const Color _lightBlue = Color(0xFF4AA3FF);
 const Color _yellow = Color(0xFFFFD23F);
+const Color _crossRed = Color(0xFFD13B3B);
+const Color _paramedicTeal = Color(0xFF1F9E8F);
 
 /// Maps a vehicle-local (u along its length, v across) into the screen for
 /// a vehicle heading [dir] inside [rect]. u = 0 is the tail, 1 the nose.
@@ -74,7 +76,7 @@ Rect paintVehicle(
   final color = colorFor(colorIndex);
   final short = min(footprint.width, footprint.height);
   final cornerFactor = switch (kind) {
-    VehicleKind.sedan || VehicleKind.policeCar => 0.36,
+    VehicleKind.sedan || VehicleKind.policeCar || VehicleKind.ambulance => 0.36,
     VehicleKind.coaster => 0.28,
     VehicleKind.bus => 0.22,
     VehicleKind.fireTruck => 0.2,
@@ -119,7 +121,9 @@ Rect paintVehicle(
   _paintRoofDetails(canvas, f, kind, color);
   if (showArrow) {
     final c = switch (kind) {
-      VehicleKind.policeCar || VehicleKind.fireTruck => f.at(0.3, 0.5),
+      VehicleKind.policeCar ||
+      VehicleKind.fireTruck ||
+      VehicleKind.ambulance => f.at(0.3, 0.5),
       _ => roofRect.center,
     };
     _paintArrow(canvas, c, short * 0.5, dir);
@@ -135,7 +139,7 @@ void _paintSide(
   double short,
 ) {
   final n = switch (kind) {
-    VehicleKind.sedan || VehicleKind.policeCar => 3,
+    VehicleKind.sedan || VehicleKind.policeCar || VehicleKind.ambulance => 3,
     VehicleKind.coaster => 5,
     VehicleKind.bus => 9,
     VehicleKind.fireTruck => 0,
@@ -217,6 +221,15 @@ void _paintRoofDetails(Canvas canvas, _Frame f, VehicleKind kind, Color color) {
       _fill(canvas, f.box(0.4, 0.5, 0.48, 0.8), _lightBlue, 2);
       _fill(canvas, f.box(0.76, 0.42, 0.9, 0.58), _policeBlue, 2); // hood
       _headlights(canvas, f, 0.93);
+    case VehicleKind.ambulance:
+      _fill(canvas, f.box(0.56, 0.1, 0.72, 0.9), _glass, 3);
+      _fill(canvas, f.box(0.2, 0.12, 0.32, 0.88), _glass, 3);
+      // Red cross on the roof.
+      _fill(canvas, f.box(0.3, 0.41, 0.55, 0.59), _crossRed, 1.5);
+      _fill(canvas, f.box(0.38, 0.25, 0.47, 0.75), _crossRed, 1.5);
+      _fill(canvas, f.box(0.76, 0.3, 0.82, 0.48), _lightRed, 1.5); // beacons
+      _fill(canvas, f.box(0.76, 0.52, 0.82, 0.7), _lightBlue, 1.5);
+      _headlights(canvas, f, 0.93);
     case VehicleKind.fireTruck:
       _fill(canvas, f.box(0.86, 0.12, 0.97, 0.88), _glass, 3); // cab glass
       _fill(canvas, f.box(0.8, 0.3, 0.84, 0.7), _lightBlue, 1.5); // beacon
@@ -288,7 +301,8 @@ void _paintArrow(Canvas canvas, Offset c, double size, Direction dir) {
 
 /// A little passenger standing at [c] (center of the body). Ordinary
 /// passengers are a blob in their color; police wear a cap and a badge,
-/// firefighters a helmet and a reflective stripe.
+/// paramedics a white cap with a red cross, firefighters a helmet and a
+/// reflective stripe.
 void paintPassenger(
   Canvas canvas,
   Offset c,
@@ -300,7 +314,12 @@ void paintPassenger(
     return;
   }
   final police = colorIndex == policeColor;
-  final bodyColor = police ? _policeBlue : const Color(0xFF3A3F47);
+  final paramedic = colorIndex == ambulanceColor;
+  final bodyColor = police
+      ? _policeBlue
+      : paramedic
+      ? _paramedicTeal
+      : const Color(0xFF3A3F47);
   paintPerson(canvas, c, bodyColor, scale: scale);
   final head = c.translate(0, -5.5 * scale);
   // Face.
@@ -331,6 +350,35 @@ void paintPassenger(
       c.translate(2.5 * scale, 2.5 * scale),
       1.3 * scale,
       Paint()..color = _yellow,
+    );
+  } else if (paramedic) {
+    // White cap with a small red cross, and a red band on the chest.
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: head.translate(0, -0.6 * scale),
+        width: 11 * scale,
+        height: 10 * scale,
+      ),
+      pi,
+      pi,
+      true,
+      Paint()..color = const Color(0xFFFFFFFF),
+    );
+    final cap = head.translate(0, -3 * scale);
+    final cross = Paint()
+      ..color = _crossRed
+      ..strokeWidth = 1.3 * scale;
+    canvas.drawLine(cap.translate(-1.6 * scale, 0), cap.translate(1.6 * scale, 0), cross);
+    canvas.drawLine(cap.translate(0, -1.6 * scale), cap.translate(0, 1.6 * scale), cross);
+    _fill(
+      canvas,
+      Rect.fromCenter(
+        center: c.translate(0, 5.5 * scale),
+        width: 11 * scale,
+        height: 2 * scale,
+      ),
+      _crossRed,
+      0.8 * scale,
     );
   } else {
     // Helmet and reflective stripe.

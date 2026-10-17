@@ -1,8 +1,10 @@
-/// Passenger / vehicle colors 0..5 are ordinary; these two are services.
+/// Passenger / vehicle colors 0..5 are ordinary; these three are services.
 /// A passenger boards a vehicle of the same color index, so police only
-/// ever board police cars and firefighters only fire trucks.
+/// ever board police cars, firefighters only fire trucks and paramedics
+/// only ambulances.
 const int policeColor = 10;
 const int fireColor = 11;
+const int ambulanceColor = 12;
 
 bool isServiceColor(int colorIndex) => colorIndex >= policeColor;
 
@@ -13,16 +15,19 @@ bool isServiceColor(int colorIndex) => colorIndex >= policeColor;
 /// - bus: 5 cells, 10 seats
 /// - police car: a sedan for police passengers
 /// - fire truck: a coaster-sized truck for firefighters
+/// - ambulance: a sedan-sized van for paramedics
 enum VehicleKind {
   sedan,
   coaster,
   bus,
   policeCar,
-  fireTruck;
+  fireTruck,
+  ambulance;
 
   static VehicleKind of({required int length, required int colorIndex}) {
     if (colorIndex == policeColor) return VehicleKind.policeCar;
     if (colorIndex == fireColor) return VehicleKind.fireTruck;
+    if (colorIndex == ambulanceColor) return VehicleKind.ambulance;
     if (length <= 2) return VehicleKind.sedan;
     if (length == 3) return VehicleKind.coaster;
     return VehicleKind.bus;

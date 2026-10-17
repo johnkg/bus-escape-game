@@ -22,6 +22,7 @@ class LevelConfig {
     this.longBusChance = 0,
     this.policeChance = 0,
     this.fireChance = 0,
+    this.ambulanceChance = 0,
   });
 
   final int rows;
@@ -48,6 +49,9 @@ class LevelConfig {
   /// a fire truck (6 seats, firefighters only).
   final double policeChance;
   final double fireChance;
+
+  /// Chance a vehicle is an ambulance (4 seats, paramedics only).
+  final double ambulanceChance;
 
   /// Whether the lot gets a non-rectangular outline.
   final bool irregular;
@@ -83,6 +87,9 @@ class LevelGenerator {
       longBusChance: n >= 4 ? (0.06 + n * 0.002).clamp(0.06, 0.14) : 0,
       policeChance: n >= 12 ? (0.04 + (n - 12) * 0.004).clamp(0.04, 0.12) : 0,
       fireChance: n >= 20 ? (0.04 + (n - 20) * 0.004).clamp(0.04, 0.1) : 0,
+      ambulanceChance: n >= 28
+          ? (0.04 + (n - 28) * 0.004).clamp(0.04, 0.1)
+          : 0,
     );
   }
 
@@ -157,7 +164,7 @@ class LevelGenerator {
       for (var t = 0; t < 250 && found == null; t++) {
         var length = rng.chance(c.busChance) ? 3 : 2;
         if (c.longBusChance > 0 && rng.chance(c.longBusChance)) length = 5;
-        // Services are a 4-seat police car or a 6-seat fire truck; their
+        // Services are a 4-seat police car or ambulance, or a 6-seat fire truck; their
         // passengers only board their own vehicle.
         var service = -1;
         if (c.fireChance > 0 && rng.chance(c.fireChance)) {
@@ -165,6 +172,9 @@ class LevelGenerator {
           length = 3;
         } else if (c.policeChance > 0 && rng.chance(c.policeChance)) {
           service = policeColor;
+          length = 2;
+        } else if (c.ambulanceChance > 0 && rng.chance(c.ambulanceChance)) {
+          service = ambulanceColor;
           length = 2;
         }
         final dir = Direction.values[rng.nextInt(4)];
