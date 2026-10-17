@@ -131,7 +131,7 @@ void main() {
     });
 
     test('only sedans, coaster buses and buses; services keep their kind', () {
-      var police = 0, fire = 0, buses = 0;
+      var police = 0, fire = 0, ambulance = 0, buses = 0;
       for (var n = 1; n <= 80; n++) {
         for (final b in gen(n).buses) {
           expect([2, 3, 5], contains(b.length), reason: 'level $n');
@@ -141,6 +141,9 @@ void main() {
           } else if (b.colorIndex == fireColor) {
             fire++;
             expect(b.length, 3, reason: 'fire truck is 6 seats (level $n)');
+          } else if (b.colorIndex == ambulanceColor) {
+            ambulance++;
+            expect(b.length, 2, reason: 'ambulance is 4 seats (level $n)');
           } else {
             expect(b.colorIndex, lessThan(6), reason: 'level $n');
           }
@@ -149,6 +152,7 @@ void main() {
       }
       expect(police, greaterThan(0));
       expect(fire, greaterThan(0));
+      expect(ambulance, greaterThan(0));
       expect(buses, greaterThan(0));
     });
 
@@ -163,6 +167,13 @@ void main() {
       for (var n = 1; n < 20; n++) {
         expect(
           gen(n).buses.any((b) => b.colorIndex == fireColor),
+          isFalse,
+          reason: 'level $n',
+        );
+      }
+      for (var n = 1; n < 28; n++) {
+        expect(
+          gen(n).buses.any((b) => b.colorIndex == ambulanceColor),
           isFalse,
           reason: 'level $n',
         );
@@ -192,6 +203,31 @@ void main() {
       expect(s.queue, isEmpty);
     });
 
+    test('paramedics only board the ambulance', () {
+      const police = ParkedBus(id: 0, colorIndex: policeColor, capacity: 4);
+      const ambulance = ParkedBus(
+        id: 1,
+        colorIndex: ambulanceColor,
+        capacity: 4,
+      );
+      GameState state(List<ParkedBus?> lane, List<int> queue) => GameState(
+        rows: 2,
+        cols: 2,
+        buses: const [],
+        lane: lane,
+        queue: queue,
+      );
+
+      var s = Rules.board(state([police], [ambulanceColor]));
+      expect(s.lane[0]!.boarded, 0);
+      expect(s.queue, [ambulanceColor]);
+
+      s = Rules.board(state([police, ambulance], [ambulanceColor]));
+      expect(s.lane[0]!.boarded, 0);
+      expect(s.lane[1]!.boarded, 1);
+      expect(s.queue, isEmpty);
+    });
+
     test('vehicle kinds follow length and color', () {
       expect(
         VehicleKind.of(length: 2, colorIndex: 1),
@@ -206,6 +242,10 @@ void main() {
       expect(
         VehicleKind.of(length: 3, colorIndex: fireColor),
         VehicleKind.fireTruck,
+      );
+      expect(
+        VehicleKind.of(length: 2, colorIndex: ambulanceColor),
+        VehicleKind.ambulance,
       );
     });
 

@@ -141,7 +141,9 @@ VehicleKind _kindOf(ParkedBus p) => VehicleKind.of(
 ({double w, double h}) _bayFill(VehicleKind kind) => switch (kind) {
   VehicleKind.bus => (w: 1.0, h: 1.0),
   VehicleKind.coaster || VehicleKind.fireTruck => (w: 0.94, h: 0.8),
-  VehicleKind.sedan || VehicleKind.policeCar => (w: 0.86, h: 0.62),
+  VehicleKind.sedan ||
+  VehicleKind.policeCar ||
+  VehicleKind.ambulance => (w: 0.86, h: 0.62),
 };
 
 /// Size of a parked vehicle in [slot]; the flight shrinks to exactly this.
@@ -297,7 +299,7 @@ final _seatsText = TextPaint(
   ),
 );
 
-/// What tells a police car or fire truck apart in the bay.
+/// What tells a police car, fire truck or ambulance apart in the bay.
 void _laneBadge(Canvas canvas, VehicleKind kind, Rect body, Rect glass) {
   switch (kind) {
     case VehicleKind.policeCar:
@@ -347,6 +349,21 @@ void _laneBadge(Canvas canvas, VehicleKind kind, Rect body, Rect glass) {
         final x = rack.left + rack.width * (i + 0.5) / 6;
         canvas.drawLine(Offset(x, rack.top), Offset(x, rack.bottom), rung);
       }
+    case VehicleKind.ambulance:
+      // Red and blue beacons either side of the windscreen and a red stripe.
+      for (final (x, c) in [
+        (body.left + body.width * 0.18, const Color(0xFFFF4A4A)),
+        (body.right - body.width * 0.18, const Color(0xFF4AA3FF)),
+      ]) {
+        canvas.drawCircle(Offset(x, glass.bottom + 1.2), 1.8, Paint()..color = c);
+      }
+      canvas.drawLine(
+        Offset(body.left + 2, body.bottom - 2.5),
+        Offset(body.right - 2, body.bottom - 2.5),
+        Paint()
+          ..color = const Color(0xFFD13B3B)
+          ..strokeWidth = 2,
+      );
     case VehicleKind.sedan || VehicleKind.coaster || VehicleKind.bus:
       break;
   }

@@ -13,10 +13,12 @@ const List<Color> busColors = [
 ];
 
 /// Body color of a vehicle (and its ordinary passengers) by color index.
-/// Police cars are white with blue trim, fire trucks deep red.
+/// Police cars are white with blue trim, fire trucks deep red and
+/// ambulances pale green-white with a red cross.
 Color colorFor(int colorIndex) {
   if (colorIndex == policeColor) return const Color(0xFFF1F4F8);
   if (colorIndex == fireColor) return const Color(0xFFC62828);
+  if (colorIndex == ambulanceColor) return const Color(0xFFD6F2E3);
   return busColors[colorIndex % busColors.length];
 }
 
