@@ -12,6 +12,7 @@ import 'boarding_passenger.dart';
 import 'bus_component.dart';
 import 'confetti.dart';
 import 'departing_bus.dart';
+import 'full_pop.dart';
 import 'lane_delta.dart';
 import 'lane_view.dart';
 import 'locked_slot_button.dart';
@@ -197,16 +198,17 @@ class BusEscapeGame extends FlameGame {
     _sentOff.add(parked.id);
     _bayOfBus.remove(parked.id);
     feedback?.emit(GameEvent.depart);
-    world.add(
+    world.addAll([
       DepartingBus(slot: bay, bus: parked.withBoarded(parked.capacity)),
-    );
+      FullPop(slot: bay),
+    ]);
   }
 
   void _depart(int bay, ParkedBus full) {
     _lane.bays.remove(bay);
     _bayOfBus.remove(full.id);
     feedback?.emit(GameEvent.depart);
-    world.add(DepartingBus(slot: bay, bus: full));
+    world.addAll([DepartingBus(slot: bay, bus: full), FullPop(slot: bay)]);
   }
 
   /// Returns true if [id] got [bay] straight away.

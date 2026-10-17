@@ -83,6 +83,7 @@ class LaneView extends PositionComponent with HasGameReference<BusEscapeGame> {
       canvas.save();
       canvas.translate(0, lift);
       paintLaneVehicle(canvas, r, p, symbols: game.showSymbols);
+      paintSeatsLeft(canvas, r, p);
       canvas.restore();
     }
   }
@@ -263,6 +264,38 @@ void paintLaneVehicle(
     }
   }
 }
+
+/// How many seats are still empty, as a small badge on the vehicle's top
+/// corner, so a glance shows which vehicle is nearly ready to go.
+void paintSeatsLeft(Canvas canvas, Rect slot, ParkedBus p) {
+  final left = p.capacity - p.boarded;
+  if (left <= 0) return;
+  final body = _laneBody(slot, p).body;
+  final c = Offset(body.right - 1, body.top + 1);
+  canvas.drawCircle(c, 8, Paint()..color = const Color(0xFFFFFFFF));
+  canvas.drawCircle(
+    c,
+    8,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = shade(colorFor(p.colorIndex), -0.25),
+  );
+  _seatsText.render(
+    canvas,
+    '$left',
+    Vector2(c.dx, c.dy),
+    anchor: Anchor.center,
+  );
+}
+
+final _seatsText = TextPaint(
+  style: const TextStyle(
+    color: Color(0xFF1B2733),
+    fontSize: 11,
+    fontWeight: FontWeight.w900,
+  ),
+);
 
 /// What tells a police car or fire truck apart in the bay.
 void _laneBadge(Canvas canvas, VehicleKind kind, Rect body, Rect glass) {
