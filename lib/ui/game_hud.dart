@@ -223,7 +223,8 @@ class _TimeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final low = seconds <= 10;
-    final text = '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
+    final secs = (seconds % 60).toString().padLeft(2, '0');
+    final text = '${seconds ~/ 60}:$secs';
     return Container(
       key: const Key('time-chip'),
       margin: const EdgeInsets.only(top: 2),

@@ -452,7 +452,8 @@ class BusEscapeGame extends FlameGame {
       session.state.status != GameStatus.won &&
       !timeUp.value;
 
-  bool get canHint => session.state.status == GameStatus.playing && !timeUp.value;
+  bool get canHint =>
+      session.state.status == GameStatus.playing && !timeUp.value;
 
   /// The bus currently glowing as a hint, if any.
   int? get hintedBusId {

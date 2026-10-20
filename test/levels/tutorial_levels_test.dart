@@ -198,7 +198,10 @@ void main() {
       [for (var n = 1; n <= 30; n++) if (LevelRepository.isTimed(n)) n],
       [13, 18, 23, 28],
     );
-    expect(LevelRepository.timeLimitFor(3, LevelRepository.levelFor(3)), isNull);
+    expect(
+      LevelRepository.timeLimitFor(3, LevelRepository.levelFor(3)),
+      isNull,
+    );
     final level = LevelRepository.levelFor(13);
     expect(
       LevelRepository.timeLimitFor(13, level),
