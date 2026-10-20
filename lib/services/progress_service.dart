@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/core.dart' show dayNumber;
+
 enum Booster { undo, hint, refresh, clear, sort }
 
 /// Persistent progress, boosters and settings, backed by shared_preferences.
@@ -79,6 +81,41 @@ class ProgressService extends ChangeNotifier {
   Future<void> addBooster(Booster b, int amount) async {
     await _prefs.setInt(_boosterKey(b), boosterCount(b) + amount);
     notifyListeners();
+  }
+
+  static const _dailyLastKey = 'daily_last';
+  static const _dailyStreakKey = 'daily_streak';
+
+  /// True once the challenge for [date] has been cleared.
+  bool dailyDone(DateTime date) =>
+      _prefs.getInt(_dailyLastKey) == dayNumber(date);
+
+  /// Consecutive days with a cleared challenge, ending today or yesterday.
+  /// A missed day resets it.
+  int dailyStreak(DateTime today) {
+    final last = _prefs.getInt(_dailyLastKey);
+    if (last == null || last < dayNumber(today) - 1) return 0;
+    return _prefs.getInt(_dailyStreakKey) ?? 0;
+  }
+
+  /// Coins for clearing the daily challenge: 50, plus 10 per day of streak
+  /// up to a week.
+  static int dailyCoins(int streak) => 50 + 10 * (streak.clamp(1, 7) - 1);
+
+  /// Records a cleared daily challenge. Returns the coins paid, or 0 if
+  /// [date] was already cleared (replays pay nothing).
+  Future<int> recordDaily(DateTime date) async {
+    if (dailyDone(date)) return 0;
+    final day = dayNumber(date);
+    final streak = _prefs.getInt(_dailyLastKey) == day - 1
+        ? (_prefs.getInt(_dailyStreakKey) ?? 0) + 1
+        : 1;
+    await _prefs.setInt(_dailyLastKey, day);
+    await _prefs.setInt(_dailyStreakKey, streak);
+    final coins = dailyCoins(streak);
+    await _prefs.setInt('coins', this.coins + coins);
+    notifyListeners();
+    return coins;
   }
 
   static const int startingCoins = 300;

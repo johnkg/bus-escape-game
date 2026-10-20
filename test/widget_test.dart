@@ -34,6 +34,19 @@ void main() {
     expect(find.text('Moves 0'), findsOneWidget);
   });
 
+  testWidgets('daily challenge starts from the menu and leaves levels alone', (
+    tester,
+  ) async {
+    final progress = await loadProgress(tester, {'unlocked': 3});
+    await tester.pumpWidget(BusEscapeApp(progress: progress));
+    await tester.tap(find.byKey(const Key('daily-button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(GameWidget<BusEscapeGame>), findsOneWidget);
+    expect(find.text('Daily Challenge'), findsWidgets);
+    expect(progress.unlockedLevel, 3);
+  });
+
   testWidgets('level select locks levels beyond progress', (tester) async {
     final progress = await loadProgress(tester, {'unlocked': 2});
     await tester.pumpWidget(BusEscapeApp(progress: progress));

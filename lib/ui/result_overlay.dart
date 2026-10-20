@@ -13,6 +13,8 @@ class ResultOverlay extends StatelessWidget {
     required this.onMenu,
     this.rewarded = false,
     this.coins = 0,
+    this.daily = false,
+    this.streak = 0,
     this.undoButton,
     this.extraSlotButton,
   });
@@ -30,6 +32,10 @@ class ResultOverlay extends StatelessWidget {
 
   /// Coins earned by this win.
   final int coins;
+
+  /// The daily challenge: no next level, and the streak is shown.
+  final bool daily;
+  final int streak;
 
   /// Shown on the lose card so a run can be rescued.
   final Widget? undoButton;
@@ -51,7 +57,7 @@ class ResultOverlay extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  won ? 'Level clear!' : 'Lane full!',
+                  won ? (daily ? 'Daily clear!' : 'Level clear!') : 'Lane full!',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 30,
@@ -82,6 +88,14 @@ class ResultOverlay extends StatelessWidget {
                         ),
                       ),
                     ),
+                  if (daily && streak > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '$streak-day streak. Come back tomorrow!',
+                        style: const TextStyle(color: Color(0xFFF5C21B)),
+                      ),
+                    ),
                   if (rewarded)
                     const Padding(
                       padding: EdgeInsets.only(top: 4),
@@ -104,8 +118,10 @@ class ResultOverlay extends StatelessWidget {
                   undoButton!,
                   const SizedBox(height: 12),
                 ],
-                if (won) BigButton(label: 'Next level', onPressed: onNext),
-                if (won) const SizedBox(height: 12),
+                if (won && !daily) ...[
+                  BigButton(label: 'Next level', onPressed: onNext),
+                  const SizedBox(height: 12),
+                ],
                 BigButton(
                   label: won ? 'Replay' : 'Retry',
                   color: won

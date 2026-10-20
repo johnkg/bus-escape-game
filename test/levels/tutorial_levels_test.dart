@@ -177,4 +177,19 @@ void main() {
       expect(Level.fromJson(l.toJson()).hint, 'hello');
     });
   });
+
+  test('the daily level is the same all day, differs by day, and is solvable',
+      () {
+    final a = LevelRepository.dailyLevel(DateTime(2026, 10, 19, 8));
+    final b = LevelRepository.dailyLevel(DateTime(2026, 10, 19, 23));
+    expect(a.toJson(), b.toJson());
+    expect(
+      a.toJson(),
+      isNot(LevelRepository.dailyLevel(DateTime(2026, 10, 20)).toJson()),
+    );
+    for (var d = 0; d < 14; d++) {
+      final level = LevelRepository.dailyLevel(DateTime(2026, 10, 1 + d));
+      expect(Solver.solve(level.toState()).order, isNotNull, reason: 'day $d');
+    }
+  });
 }
