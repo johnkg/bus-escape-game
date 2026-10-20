@@ -16,9 +16,12 @@ import 'widgets.dart';
 /// Hosts the Flame game in a centered portrait box (letterboxed on wide
 /// screens) with the Flutter HUD, boosters and result dialog on top.
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.levelNumber});
+  const GameScreen({super.key, this.levelNumber = 0, this.daily});
 
   final int levelNumber;
+
+  /// Plays the daily challenge for this date instead of a numbered level.
+  final DateTime? daily;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -31,6 +34,7 @@ class _GameScreenState extends State<GameScreen> {
   bool _rewarded = false;
   int _stars = 0;
   int _coinsEarned = 0;
+  int _streak = 0;
   bool _paused = false;
 
   @override
@@ -44,7 +48,9 @@ class _GameScreenState extends State<GameScreen> {
     final progress = ProgressScope.read(context);
     feedback.syncMusic(); // first game screen follows a tap, so audio may start
     _game = BusEscapeGame(
-      level: LevelRepository.levelFor(widget.levelNumber),
+      level: widget.daily != null
+          ? LevelRepository.dailyLevel(widget.daily!)
+          : LevelRepository.levelFor(widget.levelNumber),
       feedback: feedback,
       symbolsEnabled: () => progress.symbolsOn,
     );
@@ -54,6 +60,7 @@ class _GameScreenState extends State<GameScreen> {
     _rewarded = false;
     _stars = 0;
     _coinsEarned = 0;
+    _streak = 0;
     _paused = false;
     _game.onUnlockRequested = _unlockSlot;
     _game.onAirlift = () => progress.useBooster(Booster.clear);
@@ -87,6 +94,18 @@ class _GameScreenState extends State<GameScreen> {
 
   Future<void> _recordWin(int moves, int stars) async {
     final progress = ProgressScope.read(context);
+    final date = widget.daily;
+    if (date != null) {
+      setState(() => _stars = stars);
+      final coins = await progress.recordDaily(date);
+      if (mounted) {
+        setState(() {
+          _coinsEarned = coins;
+          _streak = progress.dailyStreak(date);
+        });
+      }
+      return;
+    }
     final previous = progress.stars(widget.levelNumber);
     final coins = ProgressService.winCoins(
       previousStars: previous,
@@ -229,6 +248,7 @@ class _GameScreenState extends State<GameScreen> {
                         children: [
                           HudTop(
                             levelNumber: widget.levelNumber,
+                            title: widget.daily == null ? null : 'Daily Challenge',
                             moves: s.moves,
                             coins: progress.coins,
                             onPause: () => _setPaused(true),
@@ -288,6 +308,8 @@ class _GameScreenState extends State<GameScreen> {
                               stars: _stars,
                               rewarded: _rewarded,
                               coins: _coinsEarned,
+                              daily: widget.daily != null,
+                              streak: _streak,
                               onNext: () => _goTo(widget.levelNumber + 1),
                               onRetry: _retry,
                               onMenu: () =>

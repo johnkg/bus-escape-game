@@ -7,12 +7,16 @@ class HudTop extends StatelessWidget {
   const HudTop({
     super.key,
     required this.levelNumber,
+    this.title,
     required this.moves,
     required this.coins,
     required this.onPause,
   });
 
   final int levelNumber;
+
+  /// Replaces "Level N" (the daily challenge has no number).
+  final String? title;
   final int moves;
   final int coins;
   final VoidCallback onPause;
@@ -56,7 +60,7 @@ class HudTop extends StatelessWidget {
           Expanded(
             child: Column(
               children: [
-                OutlinedText('Level $levelNumber', fontSize: 24),
+                OutlinedText(title ?? 'Level $levelNumber', fontSize: 24),
                 Text(
                   'Moves $moves',
                   style: const TextStyle(

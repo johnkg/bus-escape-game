@@ -164,4 +164,50 @@ void main() {
     await p.recordWin(1, 5);
     expect(n, greaterThan(0));
   });
+
+  group('daily challenge', () {
+    final mon = DateTime(2026, 10, 19);
+    final tue = DateTime(2026, 10, 20);
+    final thu = DateTime(2026, 10, 22);
+
+    test('pays once a day and builds a streak on consecutive days', () async {
+      final p = await load();
+      expect(p.dailyDone(mon), isFalse);
+      expect(p.dailyStreak(mon), 0);
+
+      expect(await p.recordDaily(mon), ProgressService.dailyCoins(1));
+      expect(p.dailyDone(mon), isTrue);
+      expect(p.dailyStreak(mon), 1);
+      expect(p.coins, ProgressService.startingCoins + 50);
+
+      // A replay the same day pays nothing and keeps the streak.
+      expect(await p.recordDaily(mon), 0);
+      expect(p.dailyStreak(mon), 1);
+
+      expect(await p.recordDaily(tue), ProgressService.dailyCoins(2));
+      expect(p.dailyStreak(tue), 2);
+    });
+
+    test('a missed day resets the streak', () async {
+      final p = await load();
+      await p.recordDaily(mon);
+      await p.recordDaily(tue);
+      expect(p.dailyStreak(thu), 0);
+      await p.recordDaily(thu);
+      expect(p.dailyStreak(thu), 1);
+    });
+
+    test('does not touch level progress', () async {
+      final p = await load();
+      await p.recordDaily(mon);
+      expect(p.unlockedLevel, 1);
+      expect(p.totalStars, 0);
+    });
+
+    test('coin reward grows with the streak up to a week', () {
+      expect(ProgressService.dailyCoins(1), 50);
+      expect(ProgressService.dailyCoins(7), 110);
+      expect(ProgressService.dailyCoins(30), 110);
+    });
+  });
 }

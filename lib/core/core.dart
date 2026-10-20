@@ -1,4 +1,5 @@
 export 'bus.dart';
+export 'daily.dart';
 export 'vehicle_kind.dart';
 export 'direction.dart';
 export 'game_state.dart';

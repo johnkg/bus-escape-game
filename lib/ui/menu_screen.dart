@@ -41,6 +41,27 @@ class MenuScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           BigButton(
+            key: const Key('daily-button'),
+            label: progress.dailyDone(DateTime.now())
+                ? 'Daily Challenge  ✓'
+                : 'Daily Challenge',
+            color: const Color(0xFF2E9E4F),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => GameScreen(daily: DateTime.now()),
+              ),
+            ),
+          ),
+          if (progress.dailyStreak(DateTime.now()) > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                '${progress.dailyStreak(DateTime.now())}-day streak',
+                style: const TextStyle(color: Color(0xFFF5C21B)),
+              ),
+            ),
+          const SizedBox(height: 16),
+          BigButton(
             label: 'Levels',
             color: const Color(0xFF3498DB),
             onPressed: () => Navigator.of(context).push(
