@@ -35,6 +35,7 @@ class _GameScreenState extends State<GameScreen> {
   int _stars = 0;
   int _coinsEarned = 0;
   int _streak = 0;
+  bool _fast = false;
   bool _paused = false;
 
   @override
@@ -55,15 +56,26 @@ class _GameScreenState extends State<GameScreen> {
       symbolsEnabled: () => progress.symbolsOn,
     );
     _game.stateNotifier.addListener(_onStateChanged);
+    _game.timeUp.addListener(_onTimeUp);
+    final limit = widget.daily == null
+        ? LevelRepository.timeLimitFor(widget.levelNumber, _game.level)
+        : null;
+    if (limit != null) _game.startTimer(limit);
     _showResult = false;
     _recorded = false;
     _rewarded = false;
     _stars = 0;
     _coinsEarned = 0;
     _streak = 0;
+    _fast = false;
     _paused = false;
     _game.onUnlockRequested = _unlockSlot;
     _game.onAirlift = () => progress.useBooster(Booster.clear);
+  }
+
+  void _onTimeUp() {
+    if (!_game.timeUp.value || !mounted) return;
+    setState(() => _showResult = true);
   }
 
   void _onStateChanged() {
@@ -107,13 +119,16 @@ class _GameScreenState extends State<GameScreen> {
       return;
     }
     final previous = progress.stars(widget.levelNumber);
-    final coins = ProgressService.winCoins(
+    var coins = ProgressService.winCoins(
       previousStars: previous,
       stars: stars,
     );
+    final fast = _game.timeFraction >= 0.5;
+    if (fast && coins > 0) coins += 10;
     setState(() {
       _stars = stars;
       _coinsEarned = coins;
+      _fast = fast && coins > 0;
     });
     final rewarded = await progress.recordWin(
       widget.levelNumber,
@@ -209,6 +224,7 @@ class _GameScreenState extends State<GameScreen> {
 
   void _retry() {
     _game.stateNotifier.removeListener(_onStateChanged);
+    _game.timeUp.removeListener(_onTimeUp);
     setState(_startGame);
   }
 
@@ -221,6 +237,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void dispose() {
     _game.stateNotifier.removeListener(_onStateChanged);
+    _game.timeUp.removeListener(_onTimeUp);
     super.dispose();
   }
 
@@ -249,6 +266,7 @@ class _GameScreenState extends State<GameScreen> {
                           HudTop(
                             levelNumber: widget.levelNumber,
                             title: widget.daily == null ? null : 'Daily Challenge',
+                            timeLeft: _game.timeLeft,
                             moves: s.moves,
                             coins: progress.coins,
                             onPause: () => _setPaused(true),
@@ -309,17 +327,22 @@ class _GameScreenState extends State<GameScreen> {
                               rewarded: _rewarded,
                               coins: _coinsEarned,
                               daily: widget.daily != null,
+                              timedOut: _game.timeUp.value,
+                              fast: _fast,
                               streak: _streak,
                               onNext: () => _goTo(widget.levelNumber + 1),
                               onRetry: _retry,
                               onMenu: () =>
                                   Navigator.of(context)
                                       .popUntil((r) => r.isFirst),
-                              undoButton: _undoButton(
-                                progress,
-                                const Key('result-undo'),
-                              ),
-                              extraSlotButton: _game.canAddSlot
+                              undoButton: _game.timeUp.value
+                                  ? null
+                                  : _undoButton(
+                                      progress,
+                                      const Key('result-undo'),
+                                    ),
+                              extraSlotButton:
+                                  _game.canAddSlot && !_game.timeUp.value
                                   ? BigButton(
                                       key: const Key('result-unlock'),
                                       label:

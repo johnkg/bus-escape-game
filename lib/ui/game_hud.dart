@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
 import 'widgets.dart';
@@ -8,6 +9,7 @@ class HudTop extends StatelessWidget {
     super.key,
     required this.levelNumber,
     this.title,
+    this.timeLeft,
     required this.moves,
     required this.coins,
     required this.onPause,
@@ -17,6 +19,9 @@ class HudTop extends StatelessWidget {
 
   /// Replaces "Level N" (the daily challenge has no number).
   final String? title;
+
+  /// Whole seconds left on a timed level; null when the level is untimed.
+  final ValueListenable<int?>? timeLeft;
   final int moves;
   final int coins;
   final VoidCallback onPause;
@@ -70,6 +75,13 @@ class HudTop extends StatelessWidget {
                     shadows: [Shadow(blurRadius: 3, color: Colors.black87)],
                   ),
                 ),
+                if (timeLeft != null)
+                  ValueListenableBuilder<int?>(
+                    valueListenable: timeLeft!,
+                    builder: (context, left, _) => left == null
+                        ? const SizedBox.shrink()
+                        : _TimeChip(seconds: left),
+                  ),
               ],
             ),
           ),
@@ -197,6 +209,44 @@ class PauseOverlay extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The countdown on a timed level; turns red for the last ten seconds.
+class _TimeChip extends StatelessWidget {
+  const _TimeChip({required this.seconds});
+
+  final int seconds;
+
+  @override
+  Widget build(BuildContext context) {
+    final low = seconds <= 10;
+    final secs = (seconds % 60).toString().padLeft(2, '0');
+    final text = '${seconds ~/ 60}:$secs';
+    return Container(
+      key: const Key('time-chip'),
+      margin: const EdgeInsets.only(top: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      decoration: BoxDecoration(
+        color: low ? const Color(0xFFD13B3B) : Colors.black54,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.timer, color: Colors.white, size: 15),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }

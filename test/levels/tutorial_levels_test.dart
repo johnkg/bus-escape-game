@@ -192,4 +192,20 @@ void main() {
       expect(Solver.solve(level.toState()).order, isNotNull, reason: 'day $d');
     }
   });
+
+  test('every fifth level after the tutorial is timed', () {
+    expect(
+      [for (var n = 1; n <= 30; n++) if (LevelRepository.isTimed(n)) n],
+      [13, 18, 23, 28],
+    );
+    expect(
+      LevelRepository.timeLimitFor(3, LevelRepository.levelFor(3)),
+      isNull,
+    );
+    final level = LevelRepository.levelFor(13);
+    expect(
+      LevelRepository.timeLimitFor(13, level),
+      20 + 6.0 * level.buses.length,
+    );
+  });
 }

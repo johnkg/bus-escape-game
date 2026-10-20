@@ -8,6 +8,14 @@ class LevelRepository {
 
   static int get tutorialCount => TutorialLevels.all.length;
 
+  /// Every fifth level after the tutorial (13, 18, 23, ...) races a clock.
+  static bool isTimed(int number) =>
+      number > tutorialCount && number % 5 == 3;
+
+  /// Seconds on the clock for [number], or null for an untimed level.
+  static double? timeLimitFor(int number, Level level) =>
+      isTimed(number) ? 20 + 6.0 * level.buses.length : null;
+
   /// Level ids for daily challenges start here, clear of the numbered levels.
   static const int dailyBase = 100000;
 

@@ -47,6 +47,33 @@ void main() {
     expect(progress.unlockedLevel, 3);
   });
 
+  testWidgets('a timed level shows a clock and ends when it runs out', (
+    tester,
+  ) async {
+    final progress = await loadProgress(tester, {'unlocked': 13});
+    final game = await pumpGameScreen(tester, progress, 13);
+    expect(game.timeLeft.value, isNotNull);
+    expect(find.byKey(const Key('time-chip')), findsOneWidget);
+
+    game.update(game.timeLeft.value! + 1.0);
+    await tester.pump();
+    expect(game.timeUp.value, isTrue);
+    expect(find.text("Time's up!"), findsOneWidget);
+    expect(find.byKey(const Key('result-undo')), findsNothing);
+
+    // Taps do nothing once the clock has run out.
+    final before = game.session.state.moves;
+    game.tapBus(game.session.state.buses.first.id);
+    expect(game.session.state.moves, before);
+  });
+
+  testWidgets('untimed levels have no clock', (tester) async {
+    final progress = await loadProgress(tester, {'unlocked': 12});
+    final game = await pumpGameScreen(tester, progress, 12);
+    expect(game.timeLeft.value, isNull);
+    expect(find.byKey(const Key('time-chip')), findsNothing);
+  });
+
   testWidgets('level select locks levels beyond progress', (tester) async {
     final progress = await loadProgress(tester, {'unlocked': 2});
     await tester.pumpWidget(BusEscapeApp(progress: progress));

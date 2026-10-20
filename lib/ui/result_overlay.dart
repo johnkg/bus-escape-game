@@ -14,6 +14,8 @@ class ResultOverlay extends StatelessWidget {
     this.rewarded = false,
     this.coins = 0,
     this.daily = false,
+    this.timedOut = false,
+    this.fast = false,
     this.streak = 0,
     this.undoButton,
     this.extraSlotButton,
@@ -35,6 +37,12 @@ class ResultOverlay extends StatelessWidget {
 
   /// The daily challenge: no next level, and the streak is shown.
   final bool daily;
+
+  /// Lost because the clock ran out.
+  final bool timedOut;
+
+  /// Won a timed level with at least half the clock left.
+  final bool fast;
   final int streak;
 
   /// Shown on the lose card so a run can be rescued.
@@ -57,7 +65,9 @@ class ResultOverlay extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  won ? (daily ? 'Daily clear!' : 'Level clear!') : 'Lane full!',
+                  won
+                      ? (daily ? 'Daily clear!' : 'Level clear!')
+                      : (timedOut ? "Time's up!" : 'Lane full!'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 30,
@@ -88,6 +98,14 @@ class ResultOverlay extends StatelessWidget {
                         ),
                       ),
                     ),
+                  if (fast)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Fast finish: +10 coins',
+                        style: TextStyle(color: Color(0xFFF5C21B)),
+                      ),
+                    ),
                   if (daily && streak > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
@@ -105,8 +123,10 @@ class ResultOverlay extends StatelessWidget {
                       ),
                     ),
                 ] else
-                  const Text(
-                    'No bus could take the next passenger.',
+                  Text(
+                    timedOut
+                        ? 'The clock ran out. Be quicker next time!'
+                        : 'No bus could take the next passenger.',
                     style: TextStyle(color: Colors.white70),
                   ),
                 const SizedBox(height: 24),
