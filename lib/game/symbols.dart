@@ -1,16 +1,30 @@
 import 'dart:math';
 import 'dart:ui';
 
+import '../core/core.dart' show ambulanceColor, fireColor, policeColor;
 import 'palette.dart';
 
 /// One distinct shape per bus color so the game works without telling
 /// colors apart (shown when the "Color symbols" setting is on).
-enum SymbolShape { circle, square, triangle, diamond, star, hexagon }
+enum SymbolShape {
+  circle,
+  square,
+  triangle,
+  diamond,
+  star,
+  hexagon,
+  // The services each get a shape of their own.
+  octagon,
+  drop,
+  cross,
+}
 
-SymbolShape symbolFor(int colorIndex) =>
-    SymbolShape.values[colorIndex %
-        busColors.length %
-        SymbolShape.values.length];
+SymbolShape symbolFor(int colorIndex) => switch (colorIndex) {
+  policeColor => SymbolShape.octagon,
+  fireColor => SymbolShape.drop,
+  ambulanceColor => SymbolShape.cross,
+  _ => SymbolShape.values[colorIndex % busColors.length],
+};
 
 /// Draws a white shape with a dark outline, centered on [c], about [size]
 /// across.
@@ -27,6 +41,9 @@ void paintSymbol(Canvas canvas, Offset c, double size, SymbolShape shape) {
     SymbolShape.diamond => _polygon(c, r * 1.1, 4, -pi / 2),
     SymbolShape.star => _star(c, r * 1.15),
     SymbolShape.hexagon => _polygon(c, r, 6, 0),
+    SymbolShape.octagon => _polygon(c, r * 1.05, 8, pi / 8),
+    SymbolShape.drop => _drop(c, r),
+    SymbolShape.cross => _cross(c, r * 1.1),
   };
   canvas.drawPath(
     path,
@@ -58,4 +75,28 @@ Path _star(Offset c, double r) {
     i == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
   }
   return path..close();
+}
+
+Path _drop(Offset c, double r) => Path()
+  ..moveTo(c.dx, c.dy - r * 1.15)
+  ..cubicTo(c.dx + r, c.dy - r * 0.1, c.dx + r * 0.9, c.dy + r * 0.95, c.dx, c.dy + r * 0.95)
+  ..cubicTo(c.dx - r * 0.9, c.dy + r * 0.95, c.dx - r, c.dy - r * 0.1, c.dx, c.dy - r * 1.15)
+  ..close();
+
+Path _cross(Offset c, double r) {
+  final t = r * 0.38; // half the arm thickness
+  return Path()
+    ..moveTo(c.dx - t, c.dy - r)
+    ..lineTo(c.dx + t, c.dy - r)
+    ..lineTo(c.dx + t, c.dy - t)
+    ..lineTo(c.dx + r, c.dy - t)
+    ..lineTo(c.dx + r, c.dy + t)
+    ..lineTo(c.dx + t, c.dy + t)
+    ..lineTo(c.dx + t, c.dy + r)
+    ..lineTo(c.dx - t, c.dy + r)
+    ..lineTo(c.dx - t, c.dy + t)
+    ..lineTo(c.dx - r, c.dy + t)
+    ..lineTo(c.dx - r, c.dy - t)
+    ..lineTo(c.dx - t, c.dy - t)
+    ..close();
 }

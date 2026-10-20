@@ -35,6 +35,22 @@ class ProgressService extends ChangeNotifier {
 
   int? bestMoves(int level) => _prefs.getInt(_bestKey(level));
 
+  /// Levels with at least one star.
+  int get clearedLevels => _starCounts().where((n) => n > 0).length;
+
+  /// Levels cleared with all three stars.
+  int get threeStarLevels => _starCounts().where((n) => n >= 3).length;
+
+  Iterable<int> _starCounts() => _prefs
+      .getKeys()
+      .where((k) => k.startsWith(_starsPrefix))
+      .map((k) => _prefs.getInt(k) ?? 0);
+
+  /// First-time tips (a new vehicle type, a timed level) are shown once.
+  bool tipSeen(String id) => _prefs.getBool('tip_$id') ?? false;
+
+  Future<void> markTipSeen(String id) => _prefs.setBool('tip_$id', true);
+
   /// Every Nth level, the first clear gifts one of each booster.
   static const int rewardEvery = 5;
 
@@ -102,20 +118,35 @@ class ProgressService extends ChangeNotifier {
   /// up to a week.
   static int dailyCoins(int streak) => 50 + 10 * (streak.clamp(1, 7) - 1);
 
-  /// Records a cleared daily challenge. Returns the coins paid, or 0 if
-  /// [date] was already cleared (replays pay nothing).
-  Future<int> recordDaily(DateTime date) async {
-    if (dailyDone(date)) return 0;
+  /// Every Nth day of a streak also gifts one of each booster.
+  static const int streakRewardEvery = 7;
+
+  int get bestDailyStreak => _prefs.getInt('daily_best') ?? 0;
+  int get dailiesCleared => _prefs.getInt('daily_total') ?? 0;
+
+  /// Records a cleared daily challenge. Returns the coins paid and whether
+  /// the streak earned the booster gift; both are zero/false if [date] was
+  /// already cleared (replays pay nothing).
+  Future<({int coins, bool boosters})> recordDaily(DateTime date) async {
+    if (dailyDone(date)) return (coins: 0, boosters: false);
     final day = dayNumber(date);
     final streak = _prefs.getInt(_dailyLastKey) == day - 1
         ? (_prefs.getInt(_dailyStreakKey) ?? 0) + 1
         : 1;
     await _prefs.setInt(_dailyLastKey, day);
     await _prefs.setInt(_dailyStreakKey, streak);
+    if (streak > bestDailyStreak) await _prefs.setInt('daily_best', streak);
+    await _prefs.setInt('daily_total', dailiesCleared + 1);
     final coins = dailyCoins(streak);
     await _prefs.setInt('coins', this.coins + coins);
+    final boosters = streak % streakRewardEvery == 0;
+    if (boosters) {
+      for (final b in Booster.values) {
+        await _prefs.setInt(_boosterKey(b), boosterCount(b) + 1);
+      }
+    }
     notifyListeners();
-    return coins;
+    return (coins: coins, boosters: boosters);
   }
 
   static const int startingCoins = 300;

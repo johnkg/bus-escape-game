@@ -45,6 +45,7 @@ class _GameScreenState extends State<GameScreen> {
   int _coinsEarned = 0;
   int _streak = 0;
   bool _fast = false;
+  String? _tip;
   bool _paused = false;
 
   @override
@@ -70,6 +71,7 @@ class _GameScreenState extends State<GameScreen> {
         ? LevelRepository.timeLimitFor(widget.levelNumber, _game.level)
         : null;
     if (limit != null) _game.startTimer(limit);
+    _tip = _firstTimeTips(progress, timed: limit != null);
     _showResult = false;
     _recorded = false;
     _rewarded = false;
@@ -82,6 +84,30 @@ class _GameScreenState extends State<GameScreen> {
     _game.onAirlift = () => progress.useBooster(Booster.clear);
   }
 
+  /// A short note for anything the player has not met before: a timed level
+  /// or a service vehicle. Each is shown once, ever.
+  String? _firstTimeTips(ProgressService progress, {required bool timed}) {
+    final colors = {for (final b in _game.level.buses) b.colorIndex};
+    final tips = <String, String>{
+      if (timed)
+        'timed':
+            'Timed level! Clear it before the clock runs out. '
+            'Finish with half the time left for bonus coins.',
+      if (colors.contains(policeColor))
+        'police': 'Police officers only board police cars.',
+      if (colors.contains(fireColor))
+        'fire': 'Firefighters only board fire trucks.',
+      if (colors.contains(ambulanceColor))
+        'ambulance': 'Paramedics only board ambulances.',
+    };
+    final fresh = tips.entries.where((e) => !progress.tipSeen(e.key)).toList();
+    if (fresh.isEmpty) return null;
+    for (final e in fresh) {
+      progress.markTipSeen(e.key);
+    }
+    return fresh.map((e) => e.value).join('\n');
+  }
+
   void _onTimeUp() {
     if (!_game.timeUp.value || !mounted) return;
     setState(() => _showResult = true);
@@ -89,6 +115,7 @@ class _GameScreenState extends State<GameScreen> {
 
   void _onStateChanged() {
     final s = _game.stateNotifier.value;
+    if (_tip != null && s.moves > 0) setState(() => _tip = null);
     if (s.status == GameStatus.playing) {
       // A booster rescued a lost game: take the dialog away again.
       if (_recorded || _showResult) {
@@ -122,10 +149,11 @@ class _GameScreenState extends State<GameScreen> {
     final date = widget.daily;
     if (date != null) {
       setState(() => _stars = stars);
-      final coins = await progress.recordDaily(date);
+      final result = await progress.recordDaily(date);
       if (mounted) {
         setState(() {
-          _coinsEarned = coins;
+          _coinsEarned = result.coins;
+          _rewarded = result.boosters;
           _streak = progress.dailyStreak(date);
         });
       }
@@ -294,6 +322,12 @@ class _GameScreenState extends State<GameScreen> {
                           LeftSign(count: s.queue.length),
                           if (_game.level.hint != null)
                             _HintBanner(text: _game.level.hint!),
+                          if (_tip != null)
+                            _HintBanner(
+                              key: const Key('tip-banner'),
+                              text: _tip!,
+                              onTap: () => setState(() => _tip = null),
+                            ),
                           _BoosterBar(
                             clearArmed: _game.clearArmed,
                             tilesFor: (armed) => [
@@ -455,9 +489,10 @@ class _BoosterBar extends StatelessWidget {
 
 /// Teaching text for tutorial levels, between the HUD and the board.
 class _HintBanner extends StatelessWidget {
-  const _HintBanner({required this.text});
+  const _HintBanner({super.key, required this.text, this.onTap});
 
   final String text;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -465,19 +500,22 @@ class _HintBanner extends StatelessWidget {
       top: 96,
       left: 20,
       right: 20,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-        decoration: BoxDecoration(
-          color: const Color(0xFF3F566D),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            height: 1.15,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: const Color(0xFF3F566D),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              height: 1.15,
+            ),
           ),
         ),
       ),

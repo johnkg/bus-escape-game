@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/progress_service.dart';
 import 'progress_scope.dart';
+import 'stats_screen.dart';
 import 'widgets.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -45,6 +46,14 @@ class SettingsScreen extends StatelessWidget {
             onChanged: p.setSymbolsOn,
           ),
           const Divider(color: Colors.white24),
+          ListTile(
+            key: const Key('stats-tile'),
+            leading: const Icon(Icons.bar_chart, color: Colors.white70),
+            title: const Text('Stats', style: TextStyle(color: Colors.white)),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const StatsScreen()),
+            ),
+          ),
           ListTile(
             leading: const Icon(Icons.delete_forever, color: Colors.redAccent),
             title: const Text(
