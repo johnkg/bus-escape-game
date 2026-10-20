@@ -101,6 +101,46 @@ void main() {
     expect(progress.coins, ProgressService.startingCoins);
   });
 
+  testWidgets('settings opens the stats screen', (tester) async {
+    final progress = await loadProgress(tester, {'stars_1': 3, 'stars_2': 1});
+    await tester.pumpWidget(BusEscapeApp(progress: progress));
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stats-tile')));
+    await tester.pumpAndSettle();
+    expect(find.text('Levels cleared'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('stat-Levels cleared'))).data,
+      '2',
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('stat-Three-star levels'))).data,
+      '1',
+    );
+  });
+
+  testWidgets('a first-time tip shows once for a timed level', (tester) async {
+    final progress = await loadProgress(tester, {'unlocked': 13});
+    await pumpGameScreen(tester, progress, 13);
+    expect(find.byKey(const Key('tip-banner')), findsOneWidget);
+    expect(find.textContaining('Timed level!'), findsOneWidget);
+    expect(progress.tipSeen('timed'), isTrue);
+
+    // Tap the banner to dismiss it.
+    await tester.tap(find.byKey(const Key('tip-banner')));
+    await tester.pump();
+    expect(find.byKey(const Key('tip-banner')), findsNothing);
+  });
+
+  testWidgets('a tip already seen is not shown again', (tester) async {
+    final progress = await loadProgress(tester, {
+      'unlocked': 13,
+      'tip_timed': true,
+    });
+    await pumpGameScreen(tester, progress, 13);
+    expect(find.byKey(const Key('tip-banner')), findsNothing);
+  });
+
   testWidgets('level select locks levels beyond progress', (tester) async {
     final progress = await loadProgress(tester, {'unlocked': 2});
     await tester.pumpWidget(BusEscapeApp(progress: progress));

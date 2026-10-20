@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/progress_service.dart';
 import 'game_screen.dart';
 import 'level_select_screen.dart';
 import 'progress_scope.dart';
@@ -60,9 +61,24 @@ class MenuScreen extends StatelessWidget {
           if (progress.dailyStreak(DateTime.now()) > 0)
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '${progress.dailyStreak(DateTime.now())}-day streak',
-                style: const TextStyle(color: Color(0xFFF5C21B)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (progress.dailyStreak(DateTime.now()) >=
+                      ProgressService.streakRewardEvery)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 4),
+                      child: Icon(
+                        Icons.emoji_events,
+                        color: Color(0xFFF5C21B),
+                        size: 18,
+                      ),
+                    ),
+                  Text(
+                    '${progress.dailyStreak(DateTime.now())}-day streak',
+                    style: const TextStyle(color: Color(0xFFF5C21B)),
+                  ),
+                ],
               ),
             ),
           const SizedBox(height: 16),

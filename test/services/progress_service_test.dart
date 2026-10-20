@@ -175,16 +175,16 @@ void main() {
       expect(p.dailyDone(mon), isFalse);
       expect(p.dailyStreak(mon), 0);
 
-      expect(await p.recordDaily(mon), ProgressService.dailyCoins(1));
+      expect((await p.recordDaily(mon)).coins, ProgressService.dailyCoins(1));
       expect(p.dailyDone(mon), isTrue);
       expect(p.dailyStreak(mon), 1);
       expect(p.coins, ProgressService.startingCoins + 50);
 
       // A replay the same day pays nothing and keeps the streak.
-      expect(await p.recordDaily(mon), 0);
+      expect((await p.recordDaily(mon)).coins, 0);
       expect(p.dailyStreak(mon), 1);
 
-      expect(await p.recordDaily(tue), ProgressService.dailyCoins(2));
+      expect((await p.recordDaily(tue)).coins, ProgressService.dailyCoins(2));
       expect(p.dailyStreak(tue), 2);
     });
 
@@ -204,10 +204,51 @@ void main() {
       expect(p.totalStars, 0);
     });
 
+    test('a seven-day streak gifts one of every booster', () async {
+      final p = await load();
+      for (var d = 0; d < 6; d++) {
+        final r = await p.recordDaily(mon.add(Duration(days: d)));
+        expect(r.boosters, isFalse, reason: 'day ${d + 1}');
+      }
+      expect(p.boosterCount(Booster.undo), 3);
+      final r = await p.recordDaily(mon.add(const Duration(days: 6)));
+      expect(r.boosters, isTrue);
+      for (final b in Booster.values) {
+        expect(p.boosterCount(b), 4, reason: b.name);
+      }
+    });
+
+    test('tracks the best streak and how many dailies were cleared', () async {
+      final p = await load();
+      await p.recordDaily(mon);
+      await p.recordDaily(tue);
+      await p.recordDaily(thu); // streak broken
+      expect(p.dailyStreak(thu), 1);
+      expect(p.bestDailyStreak, 2);
+      expect(p.dailiesCleared, 3);
+    });
+
     test('coin reward grows with the streak up to a week', () {
       expect(ProgressService.dailyCoins(1), 50);
       expect(ProgressService.dailyCoins(7), 110);
       expect(ProgressService.dailyCoins(30), 110);
     });
+  });
+
+  test('stats count cleared levels and three-star levels', () async {
+    final p = await load();
+    expect(p.clearedLevels, 0);
+    await p.recordWin(1, 5, stars: 3);
+    await p.recordWin(2, 7, stars: 1);
+    expect(p.clearedLevels, 2);
+    expect(p.threeStarLevels, 1);
+  });
+
+  test('tips are remembered once seen', () async {
+    final p = await load();
+    expect(p.tipSeen('timed'), isFalse);
+    await p.markTipSeen('timed');
+    expect(p.tipSeen('timed'), isTrue);
+    expect(p.tipSeen('police'), isFalse);
   });
 }
