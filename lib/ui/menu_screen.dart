@@ -22,12 +22,17 @@ class MenuScreen extends StatelessWidget {
             color: Color(0xFFF39C12),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Bus Escape',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 40,
-              fontWeight: FontWeight.bold,
+          // Long-press the title to practise any level (progress is kept).
+          GestureDetector(
+            key: const Key('menu-title'),
+            onLongPress: () => _jumpToLevel(context),
+            child: const Text(
+              'Bus Escape',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 40,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           const SizedBox(height: 48),
@@ -80,6 +85,71 @@ class MenuScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+Future<void> _jumpToLevel(BuildContext context) async {
+  final level = await showDialog<int>(
+    context: context,
+    builder: (_) => const _JumpDialog(),
+  );
+  if (level == null || !context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => GameScreen(levelNumber: level, practice: true),
+    ),
+  );
+}
+
+/// Asks for a level number. Practice runs never touch saved progress.
+class _JumpDialog extends StatefulWidget {
+  const _JumpDialog();
+
+  @override
+  State<_JumpDialog> createState() => _JumpDialogState();
+}
+
+class _JumpDialogState extends State<_JumpDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _start() {
+    final n = int.tryParse(_controller.text.trim());
+    if (n != null && n >= 1 && n <= 9999) Navigator.of(context).pop(n);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Practice a level'),
+      content: TextField(
+        key: const Key('jump-field'),
+        controller: _controller,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(
+          hintText: 'Level number (1-9999)',
+          helperText: 'Progress, stars and coins are not saved.',
+        ),
+        onSubmitted: (_) => _start(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          key: const Key('jump-go'),
+          onPressed: _start,
+          child: const Text('Start'),
+        ),
+      ],
     );
   }
 }

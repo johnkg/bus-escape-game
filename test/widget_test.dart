@@ -74,6 +74,33 @@ void main() {
     expect(find.byKey(const Key('time-chip')), findsNothing);
   });
 
+  testWidgets('long-pressing the title jumps to a level without saving', (
+    tester,
+  ) async {
+    final progress = await loadProgress(tester);
+    await tester.pumpWidget(BusEscapeApp(progress: progress));
+    await tester.longPress(find.byKey(const Key('menu-title')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('jump-field')), '13');
+    await tester.tap(find.byKey(const Key('jump-go')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    final game = tester
+        .widget<GameWidget<BusEscapeGame>>(
+          find.byType(GameWidget<BusEscapeGame>),
+        )
+        .game!;
+    expect(game.timeLeft.value, isNotNull); // level 13 is a timed level
+    expect(find.text('Practice 13'), findsWidgets);
+
+    // Running the clock out must not touch saved progress.
+    game.update(game.timeLeft.value! + 1.0);
+    await tester.pump();
+    expect(progress.unlockedLevel, 1);
+    expect(progress.coins, ProgressService.startingCoins);
+  });
+
   testWidgets('level select locks levels beyond progress', (tester) async {
     final progress = await loadProgress(tester, {'unlocked': 2});
     await tester.pumpWidget(BusEscapeApp(progress: progress));

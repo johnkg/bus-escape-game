@@ -16,12 +16,21 @@ import 'widgets.dart';
 /// Hosts the Flame game in a centered portrait box (letterboxed on wide
 /// screens) with the Flutter HUD, boosters and result dialog on top.
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, this.levelNumber = 0, this.daily});
+  const GameScreen({
+    super.key,
+    this.levelNumber = 0,
+    this.daily,
+    this.practice = false,
+  });
 
   final int levelNumber;
 
   /// Plays the daily challenge for this date instead of a numbered level.
   final DateTime? daily;
+
+  /// Plays a numbered level without recording progress, stars or coins
+  /// (the menu's hidden level jump).
+  final bool practice;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -106,6 +115,10 @@ class _GameScreenState extends State<GameScreen> {
 
   Future<void> _recordWin(int moves, int stars) async {
     final progress = ProgressScope.read(context);
+    if (widget.practice) {
+      setState(() => _stars = stars);
+      return;
+    }
     final date = widget.daily;
     if (date != null) {
       setState(() => _stars = stars);
@@ -230,7 +243,10 @@ class _GameScreenState extends State<GameScreen> {
 
   void _goTo(int level) {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => GameScreen(levelNumber: level)),
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            GameScreen(levelNumber: level, practice: widget.practice),
+      ),
     );
   }
 
@@ -265,7 +281,11 @@ class _GameScreenState extends State<GameScreen> {
                         children: [
                           HudTop(
                             levelNumber: widget.levelNumber,
-                            title: widget.daily == null ? null : 'Daily Challenge',
+                            title: widget.daily != null
+                                ? 'Daily Challenge'
+                                : widget.practice
+                                ? 'Practice ${widget.levelNumber}'
+                                : null,
                             timeLeft: _game.timeLeft,
                             moves: s.moves,
                             coins: progress.coins,
