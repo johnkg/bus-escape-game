@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../levels/level_repository.dart';
 import 'game_screen.dart';
 import 'progress_scope.dart';
 import 'widgets.dart';
@@ -58,6 +59,12 @@ class LevelSelectScreen extends StatelessWidget {
                             ),
                           ),
                           if (stars > 0) StarRow(stars: stars, size: 13),
+                          if (LevelRepository.isTimed(level))
+                            const Icon(
+                              Icons.timer,
+                              size: 14,
+                              color: Colors.white70,
+                            ),
                         ],
                       )
                     : const Icon(Icons.lock, color: Colors.white38),

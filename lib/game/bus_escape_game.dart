@@ -124,9 +124,52 @@ class BusEscapeGame extends FlameGame {
   /// drive in single file instead of on top of each other.
   static const double _launchGap = 0.15;
 
+  /// Whole seconds left on a timed level, or null when the level is untimed.
+  final ValueNotifier<int?> timeLeft = ValueNotifier(null);
+
+  /// Set once the clock of a timed level runs out.
+  final ValueNotifier<bool> timeUp = ValueNotifier(false);
+
+  double? _timeLimit;
+  double _timeUsed = 0;
+
+  /// Puts a countdown of [seconds] on this level. Pausing the engine pauses
+  /// it, and it stops as soon as core state says the game is over.
+  void startTimer(double seconds) {
+    _timeLimit = seconds;
+    _timeUsed = 0;
+    timeUp.value = false;
+    timeLeft.value = seconds.ceil();
+  }
+
+  /// Share of a timed level's clock still left (0 when untimed).
+  double get timeFraction {
+    final limit = _timeLimit;
+    return limit == null ? 0 : ((limit - _timeUsed) / limit).clamp(0.0, 1.0);
+  }
+
+  void _tickTimer(double dt) {
+    final limit = _timeLimit;
+    if (limit == null ||
+        timeUp.value ||
+        session.state.status != GameStatus.playing) {
+      return;
+    }
+    _timeUsed += dt;
+    final left = limit - _timeUsed;
+    if (left <= 0) {
+      timeLeft.value = 0;
+      clearArmed.value = false;
+      timeUp.value = true;
+    } else if (left.ceil() != timeLeft.value) {
+      timeLeft.value = left.ceil();
+    }
+  }
+
   @override
   void update(double dt) {
     _clock += dt;
+    _tickTimer(dt);
     super.update(dt);
   }
 
@@ -404,9 +447,12 @@ class BusEscapeGame extends FlameGame {
     }
   }
 
-  bool get canUndo => session.canUndo && session.state.status != GameStatus.won;
+  bool get canUndo =>
+      session.canUndo &&
+      session.state.status != GameStatus.won &&
+      !timeUp.value;
 
-  bool get canHint => session.state.status == GameStatus.playing;
+  bool get canHint => session.state.status == GameStatus.playing && !timeUp.value;
 
   /// The bus currently glowing as a hint, if any.
   int? get hintedBusId {
@@ -458,15 +504,18 @@ class BusEscapeGame extends FlameGame {
 
   bool get canRefresh =>
       session.state.status == GameStatus.playing &&
+      !timeUp.value &&
       session.state.buses.length >= 2;
 
   bool get canClear =>
       session.state.status == GameStatus.playing &&
+      !timeUp.value &&
       session.state.buses.isNotEmpty &&
       session.state.lane.contains(null);
 
   bool get canSort =>
       session.state.status == GameStatus.playing &&
+      !timeUp.value &&
       Rules.sortQueue(session.state) != null;
 
   /// Arms or disarms Clear; returns whether it is now armed.
@@ -597,7 +646,7 @@ class BusEscapeGame extends FlameGame {
 
   void tapBus(int id) {
     final before = session.state;
-    if (before.status != GameStatus.playing) return;
+    if (before.status != GameStatus.playing || timeUp.value) return;
     final comp = _buses[id];
     if (comp == null) return;
 
