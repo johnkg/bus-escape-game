@@ -50,9 +50,7 @@ class SettingsScreen extends StatelessWidget {
             key: const Key('stats-tile'),
             leading: const Icon(Icons.bar_chart, color: Colors.white70),
             title: const Text('Stats', style: TextStyle(color: Colors.white)),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const StatsScreen()),
-            ),
+            onTap: () => pushScreen(context, const StatsScreen()),
           ),
           ListTile(
             leading: const Icon(Icons.delete_forever, color: Colors.redAccent),

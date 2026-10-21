@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../game/palette.dart';
+import '../core/core.dart' show GameSession;
+
+import 'ui_style.dart';
 
 /// Shared screen frame: dark background, centered phone-width column.
 class ScreenFrame extends StatelessWidget {
@@ -13,16 +15,16 @@ class ScreenFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
+            constraints: const BoxConstraints(maxWidth: maxScreenWidth),
             child: Column(
               children: [
                 if (title != null)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(Gap.m, Gap.m, Gap.xl, 0),
                     child: Row(
                       children: [
                         IconButton(
@@ -37,7 +39,7 @@ class ScreenFrame extends StatelessWidget {
                           title!,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 22,
+                            fontSize: FontSizes.title,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -59,26 +61,32 @@ class BigButton extends StatelessWidget {
     super.key,
     required this.label,
     required this.onPressed,
-    this.color = const Color(0xFFF39C12),
+    this.color = AppColors.accent,
   });
 
   final String label;
   final VoidCallback onPressed;
   final Color color;
 
+  static const double width = 240;
+  static const double height = 54;
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 240,
-      height: 54,
+      width: width,
+      height: height,
       child: FilledButton(
         style: FilledButton.styleFrom(
           backgroundColor: color,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(Radii.xl),
           ),
-          textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          textStyle: const TextStyle(
+            fontSize: FontSizes.button,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         onPressed: onPressed,
         child: Text(label),
@@ -104,45 +112,53 @@ class BoosterButton extends StatelessWidget {
   final bool enabled;
   final VoidCallback onPressed;
 
+  static const double _verticalPadding = 10;
+
   @override
   Widget build(BuildContext context) {
     final active = enabled && count > 0;
     return Opacity(
-      opacity: active ? 1 : 0.4,
+      opacity: active ? 1 : disabledOpacity,
       child: Material(
-        color: const Color(0xFF3498DB),
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.secondary,
+        borderRadius: BorderRadius.circular(Radii.xl),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(Radii.xl),
           onTap: active ? onPressed : null,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+              horizontal: Gap.xl,
+              vertical: _verticalPadding,
+            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(icon, color: Colors.white),
-                const SizedBox(width: 8),
+                const SizedBox(width: Gap.m),
                 Text(
                   label,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
+                    fontSize: FontSizes.label,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: Gap.m),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
+                    horizontal: Gap.m,
+                    vertical: Gap.xxs,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.black26,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(Radii.badge),
                   ),
                   child: Text(
                     '$count',
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: FontSizes.body,
+                    ),
                   ),
                 ),
               ],
@@ -156,7 +172,9 @@ class BoosterButton extends StatelessWidget {
 
 /// Three stars, [stars] of them filled.
 class StarRow extends StatelessWidget {
-  const StarRow({super.key, required this.stars, this.size = 14});
+  const StarRow({super.key, required this.stars, this.size = defaultSize});
+
+  static const double defaultSize = 14;
 
   final int stars;
   final double size;
@@ -166,11 +184,11 @@ class StarRow extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (var i = 0; i < 3; i++)
+        for (var i = 0; i < GameSession.maxStars; i++)
           Icon(
             i < stars ? Icons.star : Icons.star_border,
             size: size,
-            color: i < stars ? const Color(0xFFF1C40F) : Colors.white54,
+            color: i < stars ? AppColors.star : Colors.white54,
           ),
       ],
     );
@@ -182,20 +200,24 @@ class OutlinedText extends StatelessWidget {
   const OutlinedText(
     this.text, {
     super.key,
-    this.fontSize = 20,
-    this.strokeWidth = 4,
+    this.fontSize = FontSizes.button,
+    this.strokeWidth = defaultStroke,
   });
+
+  static const double defaultStroke = 4;
 
   final String text;
   final double fontSize;
   final double strokeWidth;
+
+  static const double _letterSpacing = 0.5;
 
   @override
   Widget build(BuildContext context) {
     final base = TextStyle(
       fontSize: fontSize,
       fontWeight: FontWeight.w900,
-      letterSpacing: 0.5,
+      letterSpacing: _letterSpacing,
     );
     return Stack(
       children: [
@@ -206,7 +228,7 @@ class OutlinedText extends StatelessWidget {
               ..style = PaintingStyle.stroke
               ..strokeWidth = strokeWidth
               ..strokeJoin = StrokeJoin.round
-              ..color = const Color(0xFF1F2D3A),
+              ..color = AppColors.ink,
           ),
         ),
         Text(text, style: base.copyWith(color: Colors.white)),
@@ -237,13 +259,21 @@ class BoosterTile extends StatelessWidget {
   /// Highlighted while the booster waits for a follow-up tap (Clear).
   final bool armed;
 
+  static const double _disabledOpacity = 0.45;
+  static const double _width = 60;
+  static const double _buttonWidth = 56;
+  static const double _buttonHeight = 52;
+  static const double _iconSize = 30;
+  static const double _badgeSize = 22;
+  static const double _badgeOverhang = -6;
+
   @override
   Widget build(BuildContext context) {
     final active = enabled && (count > 0 || armed);
     return Opacity(
-      opacity: active ? 1 : 0.45,
+      opacity: active ? 1 : _disabledOpacity,
       child: SizedBox(
-        width: 60,
+        width: _width,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -251,39 +281,37 @@ class BoosterTile extends StatelessWidget {
               clipBehavior: Clip.none,
               children: [
                 Material(
-                  color: armed
-                      ? const Color(0xFFF39C12)
-                      : const Color(0xFF2E9E4F),
+                  color: armed ? AppColors.accent : AppColors.go,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: const BorderSide(color: Color(0xFFF3D452), width: 2),
+                    borderRadius: BorderRadius.circular(Radii.l),
+                    side: buttonRim,
                   ),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(Radii.l),
                     onTap: active ? onPressed : null,
                     child: SizedBox(
-                      width: 56,
-                      height: 52,
-                      child: Icon(icon, color: Colors.white, size: 30),
+                      width: _buttonWidth,
+                      height: _buttonHeight,
+                      child: Icon(icon, color: Colors.white, size: _iconSize),
                     ),
                   ),
                 ),
                 Positioned(
-                  top: -6,
-                  right: -6,
+                  top: _badgeOverhang,
+                  right: _badgeOverhang,
                   child: Container(
-                    width: 22,
-                    height: 22,
+                    width: _badgeSize,
+                    height: _badgeSize,
                     alignment: Alignment.center,
                     decoration: const BoxDecoration(
-                      color: Color(0xFF2E7D32),
+                      color: AppColors.goDark,
                       shape: BoxShape.circle,
                     ),
                     child: Text(
                       '$count',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 12,
+                        fontSize: FontSizes.caption,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -291,14 +319,14 @@ class BoosterTile extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: Gap.xs),
             Text(
               label,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 12,
+                fontSize: FontSizes.caption,
                 fontWeight: FontWeight.w800,
-                shadows: [Shadow(blurRadius: 3, color: Colors.black87)],
+                shadows: textOverGame,
               ),
             ),
           ],
@@ -307,3 +335,35 @@ class BoosterTile extends StatelessWidget {
     );
   }
 }
+
+/// A dimmed backdrop with a centred card, for the pause and result menus.
+class DialogCard extends StatelessWidget {
+  const DialogCard({super.key, required this.children});
+
+  final List<Widget> children;
+
+  static const double _padding = 28;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black54,
+      child: Center(
+        child: Card(
+          color: AppColors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Radii.card),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(_padding),
+            child: Column(mainAxisSize: MainAxisSize.min, children: children),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens [screen] on top of the current one.
+Future<void> pushScreen(BuildContext context, Widget screen) =>
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../core/core.dart' show GameSession;
+import '../services/progress_service.dart';
+import 'ui_style.dart';
 import 'widgets.dart';
 
 /// Win/lose card shown over the game.
@@ -51,115 +54,91 @@ class ResultOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Colors.black54,
-      child: Center(
-        child: Card(
-          color: const Color(0xFF34495E),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  won
-                      ? (daily ? 'Daily clear!' : 'Level clear!')
-                      : (timedOut ? "Time's up!" : 'Lane full!'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (won) ...[
-                  StarRow(stars: stars, size: 40),
-                  const SizedBox(height: 6),
-                  Text(
-                    switch (stars) {
-                      3 => 'Perfect!',
-                      2 => 'No boosters. Avoid blocked taps for 3 stars.',
-                      _ => 'No boosters or hints for more stars.',
-                    },
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  if (coins > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        '+$coins coins',
-                        style: const TextStyle(
-                          color: Color(0xFFF5C21B),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  if (fast)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
-                      child: Text(
-                        'Fast finish: +10 coins',
-                        style: TextStyle(color: Color(0xFFF5C21B)),
-                      ),
-                    ),
-                  if (daily && streak > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        '$streak-day streak. Come back tomorrow!',
-                        style: const TextStyle(color: Color(0xFFF5C21B)),
-                      ),
-                    ),
-                  if (rewarded)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
-                      child: Text(
-                        'Bonus: +1 of every booster',
-                        style: TextStyle(color: Color(0xFFF5C21B)),
-                      ),
-                    ),
-                ] else
-                  Text(
-                    timedOut
-                        ? 'The clock ran out. Be quicker next time!'
-                        : 'No bus could take the next passenger.',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                const SizedBox(height: 24),
-                if (!won && extraSlotButton != null) ...[
-                  extraSlotButton!,
-                  const SizedBox(height: 12),
-                ],
-                if (!won && undoButton != null) ...[
-                  undoButton!,
-                  const SizedBox(height: 12),
-                ],
-                if (won && !daily) ...[
-                  BigButton(label: 'Next level', onPressed: onNext),
-                  const SizedBox(height: 12),
-                ],
-                BigButton(
-                  label: won ? 'Replay' : 'Retry',
-                  color: won
-                      ? const Color(0xFF3498DB)
-                      : const Color(0xFFF39C12),
-                  onPressed: onRetry,
-                ),
-                const SizedBox(height: 12),
-                BigButton(
-                  label: 'Menu',
-                  color: const Color(0xFF7F8C8D),
-                  onPressed: onMenu,
-                ),
-              ],
-            ),
+    return DialogCard(
+      children: [
+        Text(
+          won
+              ? (daily ? 'Daily clear!' : 'Level clear!')
+              : (timedOut ? "Time's up!" : 'Lane full!'),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: FontSizes.heading,
+            fontWeight: FontWeight.bold,
           ),
         ),
-      ),
+        const SizedBox(height: Gap.l),
+        if (won) ...[
+          StarRow(stars: stars, size: _starSize),
+          const SizedBox(height: Gap.s),
+          Text(
+            switch (stars) {
+              GameSession.maxStars => 'Perfect!',
+              GameSession.cleanStars =>
+                'No boosters. Avoid blocked taps for 3 stars.',
+              _ => 'No boosters or hints for more stars.',
+            },
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white70),
+          ),
+          if (coins > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: Gap.m),
+              child: Text(
+                '+$coins coins',
+                style: const TextStyle(
+                  color: AppColors.gold,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          if (fast)
+            const _Bonus('Fast finish: +${ProgressService.fastFinishCoins} coins'),
+          if (daily && streak > 0)
+            _Bonus('$streak-day streak. Come back tomorrow!'),
+          if (rewarded) const _Bonus('Bonus: +1 of every booster'),
+        ] else
+          Text(
+            timedOut
+                ? 'The clock ran out. Be quicker next time!'
+                : 'No bus could take the next passenger.',
+            style: const TextStyle(color: Colors.white70),
+          ),
+        const SizedBox(height: Gap.xxxl),
+        if (!won && extraSlotButton != null) ...[
+          extraSlotButton!,
+          const SizedBox(height: Gap.l),
+        ],
+        if (!won && undoButton != null) ...[
+          undoButton!,
+          const SizedBox(height: Gap.l),
+        ],
+        if (won && !daily) ...[
+          BigButton(label: 'Next level', onPressed: onNext),
+          const SizedBox(height: Gap.l),
+        ],
+        BigButton(
+          label: won ? 'Replay' : 'Retry',
+          color: won ? AppColors.secondary : AppColors.accent,
+          onPressed: onRetry,
+        ),
+        const SizedBox(height: Gap.l),
+        BigButton(label: 'Menu', color: AppColors.muted, onPressed: onMenu),
+      ],
     );
   }
+
+  static const double _starSize = 40;
+}
+
+/// One gold line of extra rewards under the coins.
+class _Bonus extends StatelessWidget {
+  const _Bonus(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: Gap.xs),
+    child: Text(text, style: const TextStyle(color: AppColors.gold)),
+  );
 }
