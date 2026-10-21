@@ -118,7 +118,14 @@ class BusEscapeGame extends FlameGame {
   final List<TimerComponent> _pending = [];
   final Random _rng = Random();
 
-  late final QueueView _queue = QueueView(layout);
+  late final QueueView _queue = QueueView(layout, waiting: passengersLeft);
+
+  /// Passengers still waiting in the line on screen. Unlike the core
+  /// queue, which empties the moment a vehicle is tapped, this counts down
+  /// as each passenger actually walks to a vehicle.
+  late final ValueNotifier<int> passengersLeft = ValueNotifier(
+    session.state.queue.length,
+  );
 
   /// Bay -> id of the vehicle using it, from the moment it is assigned until
   /// it has pulled away. Bays are visual: a vehicle parks in the next free

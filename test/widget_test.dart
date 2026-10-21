@@ -141,6 +141,37 @@ void main() {
     expect(find.byKey(const Key('tip-banner')), findsNothing);
   });
 
+  testWidgets('the LEFT sign counts passengers down as they walk', (
+    tester,
+  ) async {
+    final progress = await loadProgress(tester);
+    final game = await pumpGameScreen(tester, progress, 1);
+    final start = game.passengersLeft.value;
+    expect(start, game.level.queue.length);
+
+    game.tapBus(Solver.orderFor(game.level)!.first);
+    // Core state has already boarded them, but nobody has walked yet.
+    expect(game.session.state.queue.length, lessThan(start));
+    expect(game.passengersLeft.value, start);
+    await tester.pump();
+    expect(find.text('$start'), findsOneWidget);
+
+    // While the vehicle drives in and people walk over, the count drops
+    // one passenger at a time until it matches core state.
+    final seen = <int>{start};
+    for (var i = 0; i < 60; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      seen.add(game.passengersLeft.value);
+    }
+    expect(game.passengersLeft.value, game.session.state.queue.length);
+    expect(
+      seen.length,
+      start - game.session.state.queue.length + 1,
+      reason: 'every intermediate count is shown',
+    );
+    await tester.pump(const Duration(seconds: 6));
+  });
+
   testWidgets('level select locks levels beyond progress', (tester) async {
     final progress = await loadProgress(tester, {'unlocked': 2});
     await tester.pumpWidget(BusEscapeApp(progress: progress));

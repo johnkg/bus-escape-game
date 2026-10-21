@@ -298,7 +298,11 @@ class _GameScreenState extends State<GameScreen> {
                             coins: progress.coins,
                             onPause: () => _setPaused(true),
                           ),
-                          LeftSign(count: s.queue.length),
+                          ValueListenableBuilder<int>(
+                            valueListenable: _game.passengersLeft,
+                            builder: (context, left, _) =>
+                                LeftSign(count: left),
+                          ),
                           if (_game.level.hint != null)
                             HintBanner(text: _game.level.hint!),
                           if (_tip != null)
