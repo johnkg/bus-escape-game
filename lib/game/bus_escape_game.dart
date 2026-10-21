@@ -15,6 +15,7 @@ import 'departing_bus.dart';
 import 'full_pop.dart';
 import 'lane_delta.dart';
 import 'lane_view.dart';
+import 'level_timer.dart';
 import 'parked_vehicle_painter.dart';
 import 'locked_slot_button.dart';
 import 'layout.dart';
@@ -73,7 +74,40 @@ class BusEscapeGame extends FlameGame {
 
   /// How long after the final tap the result dialog should wait, so the
   /// bus, boarding and celebration animations can play first.
-  Duration resultDelay = const Duration(milliseconds: 700);
+  Duration resultDelay = _defaultResultDelay;
+  static const Duration _defaultResultDelay = Duration(milliseconds: 700);
+
+  // ---- Animation timing (seconds) -------------------------------------
+
+  /// Extra wait before the result dialog, after the last effect.
+  static const double _winTail = 1.6;
+  static const double _loseTail = 0.8;
+
+  /// Pause between one move's boarding and the next one's.
+  static const double _boardingGap = 0.08;
+
+  /// Pause after a boarding before the next after-arrival effect.
+  static const double _afterBoarding = 0.12;
+
+  /// Passengers of one move all set off within this time.
+  static const double _maxBoardingSpread = 0.9;
+
+  /// A full vehicle's bay is handed on once it has pulled clear.
+  static const double _bayClearSeconds = 0.3;
+
+  /// Extra time for a vehicle that waits at the kerb for its bay.
+  static const double _kerbWaitSeconds = 1.2;
+
+  /// Timers due within this are run at once.
+  static const double _epsilon = 0.001;
+
+  // Lose shake of the whole board.
+  static const double _shakeDistance = 8;
+  static const double _shakeHalfPeriod = 0.045;
+  static const int _shakeRepeats = 5;
+
+  /// Range of seeds handed to Refresh's RNG.
+  static const int _refreshSeedRange = 1 << 30;
 
   /// Counters so tests can see that the effects fired.
   int confettiBursts = 0;
@@ -125,52 +159,27 @@ class BusEscapeGame extends FlameGame {
   /// drive in single file instead of on top of each other.
   static const double _launchGap = 0.15;
 
+  final LevelTimer _timer = LevelTimer();
+
   /// Whole seconds left on a timed level, or null when the level is untimed.
-  final ValueNotifier<int?> timeLeft = ValueNotifier(null);
+  ValueNotifier<int?> get timeLeft => _timer.timeLeft;
 
   /// Set once the clock of a timed level runs out.
-  final ValueNotifier<bool> timeUp = ValueNotifier(false);
-
-  double? _timeLimit;
-  double _timeUsed = 0;
+  ValueNotifier<bool> get timeUp => _timer.timeUp;
 
   /// Puts a countdown of [seconds] on this level. Pausing the engine pauses
   /// it, and it stops as soon as core state says the game is over.
-  void startTimer(double seconds) {
-    _timeLimit = seconds;
-    _timeUsed = 0;
-    timeUp.value = false;
-    timeLeft.value = seconds.ceil();
-  }
+  void startTimer(double seconds) => _timer.start(seconds);
 
   /// Share of a timed level's clock still left (0 when untimed).
-  double get timeFraction {
-    final limit = _timeLimit;
-    return limit == null ? 0 : ((limit - _timeUsed) / limit).clamp(0.0, 1.0);
-  }
-
-  void _tickTimer(double dt) {
-    final limit = _timeLimit;
-    if (limit == null ||
-        timeUp.value ||
-        session.state.status != GameStatus.playing) {
-      return;
-    }
-    _timeUsed += dt;
-    final left = limit - _timeUsed;
-    if (left <= 0) {
-      timeLeft.value = 0;
-      clearArmed.value = false;
-      timeUp.value = true;
-    } else if (left.ceil() != timeLeft.value) {
-      timeLeft.value = left.ceil();
-    }
-  }
+  double get timeFraction => _timer.fraction;
 
   @override
   void update(double dt) {
     _clock += dt;
-    _tickTimer(dt);
+    if (session.state.status == GameStatus.playing) {
+      _timer.tick(dt, onExpiring: () => clearArmed.value = false);
+    }
     super.update(dt);
   }
 
@@ -367,7 +376,8 @@ class BusEscapeGame extends FlameGame {
   /// Seconds between passengers setting off.
   static const double _stride = 0.12;
 
-  double _strideFor(int total) => total <= 1 ? 0 : min(_stride, 0.9 / total);
+  double _strideFor(int total) =>
+      total <= 1 ? 0 : min(_stride, _maxBoardingSpread / total);
 
   double _boardSeconds(LaneDelta delta) {
     final total = delta.boardingOrder.length;
@@ -417,7 +427,7 @@ class BusEscapeGame extends FlameGame {
     }
     // Full: off it goes, and the bay is free for the next vehicle.
     _depart(bay, now);
-    _runAfter(0.3, () => _freeBay(bay));
+    _runAfter(_bayClearSeconds, () => _freeBay(bay));
   }
 
   /// Plays one post-arrival event: its sound/haptic plus its visual.
@@ -436,8 +446,12 @@ class BusEscapeGame extends FlameGame {
         shakes++;
         camera.viewfinder.add(
           MoveEffect.by(
-            Vector2(8, 0),
-            EffectController(duration: 0.045, alternate: true, repeatCount: 5),
+            Vector2(_shakeDistance, 0),
+            EffectController(
+              duration: _shakeHalfPeriod,
+              alternate: true,
+              repeatCount: _shakeRepeats,
+            ),
           ),
         );
       case GameEvent.busExit ||
@@ -533,7 +547,7 @@ class BusEscapeGame extends FlameGame {
   /// Re-places the vehicles still in the jam. False if it could not.
   bool refresh() {
     if (!canRefresh) return false;
-    if (!session.refresh(Rng(_rng.nextInt(1 << 30)))) return false;
+    if (!session.refresh(Rng(_rng.nextInt(_refreshSeedRange)))) return false;
     _resync();
     feedback?.emit(GameEvent.booster);
     return true;
@@ -571,7 +585,9 @@ class BusEscapeGame extends FlameGame {
     var t = 0.0;
     for (var i = from; i < events.length; i++) {
       out.add(t);
-      t += events[i] == GameEvent.board ? _boardSeconds(delta) + 0.12 : _beat;
+      t += events[i] == GameEvent.board
+          ? _boardSeconds(delta) + _afterBoarding
+          : _beat;
     }
     return out;
   }
@@ -585,13 +601,16 @@ class BusEscapeGame extends FlameGame {
     double lead,
   ) {
     final tail = switch (status) {
-      GameStatus.won => 1.6,
-      GameStatus.lost => 0.8,
+      GameStatus.won => _winTail,
+      GameStatus.lost => _loseTail,
       GameStatus.playing => 0.0,
     };
     final offsets = _eventOffsets(events, delta, from);
     final last = offsets.isEmpty ? 0.0 : offsets.last;
-    return Duration(milliseconds: ((lead + last + tail) * 1000).round());
+    return Duration(
+      milliseconds:
+          ((lead + last + tail) * Duration.millisecondsPerSecond).round(),
+    );
   }
 
   void _scheduleEvents(
@@ -615,7 +634,7 @@ class BusEscapeGame extends FlameGame {
   /// given that its vehicle is in a bay at [arriveAt].
   void _planMove(_Move move, GameStatus status, double arriveAt) {
     final startAt = max(arriveAt, _boardFreeAt);
-    _boardFreeAt = startAt + _launchSpan(move.delta) + 0.08;
+    _boardFreeAt = startAt + _launchSpan(move.delta) + _boardingGap;
     resultDelay = _resultDelayFor(
       status,
       move.events,
@@ -630,7 +649,7 @@ class BusEscapeGame extends FlameGame {
   void _drain() {
     while (_moves.isNotEmpty && _moves.first.arrived) {
       final wait = _nextBoardAt - _clock;
-      if (wait > 0.001) {
+      if (wait > _epsilon) {
         if (!_drainScheduled) {
           _drainScheduled = true;
           _runAfter(wait, () {
@@ -641,7 +660,7 @@ class BusEscapeGame extends FlameGame {
         return;
       }
       final move = _moves.removeAt(0);
-      _nextBoardAt = _clock + _launchSpan(move.delta) + 0.08;
+      _nextBoardAt = _clock + _launchSpan(move.delta) + _boardingGap;
       _scheduleEvents(move.events, move.delta, from: move.from);
     }
   }
@@ -688,7 +707,7 @@ class BusEscapeGame extends FlameGame {
         ? BusComponent.liftSeconds
         : comp.flightSeconds(bay);
     // A vehicle held back for a bay that is still emptying arrives later.
-    final wait = immediate ? 0.0 : 1.2;
+    final wait = immediate ? 0.0 : _kerbWaitSeconds;
 
     feedback?.emit(events.first);
     _buses.remove(id);

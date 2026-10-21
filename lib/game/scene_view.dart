@@ -5,10 +5,11 @@ import 'package:flame/components.dart';
 import 'bus_escape_game.dart';
 import 'layout.dart';
 import 'palette.dart';
+import 'layers.dart';
 
 /// Ground, depot building and the parking lot under the jam.
 class SceneView extends PositionComponent with HasGameReference<BusEscapeGame> {
-  SceneView() : super(priority: -10);
+  SceneView() : super(priority: Layer.scene);
 
   @override
   void render(Canvas canvas) {
@@ -20,54 +21,74 @@ class SceneView extends PositionComponent with HasGameReference<BusEscapeGame> {
     _paintLot(canvas);
   }
 
+  // The depot building at the top of the screen, in design pixels.
+  static const Rect _building = Rect.fromLTWH(14, 4, 362, 126);
+  static const double _roofHeight = 26;
+  static const double _buildingRadius = 12;
+  static const Offset _buildingShadow = Offset(0, 4);
+  static const int _windowCount = 5;
+  static const Rect _firstWindow = Rect.fromLTWH(30, 50, 40, 30);
+  static const double _windowPitch = 52;
+  static const double _windowRadius = 4;
+  static const Rect _sign = Rect.fromLTWH(292, 36, 66, 48);
+  static const double _signRadius = 6;
+  static const Rect _door = Rect.fromLTWH(288, 88, 32, 42);
+  static const double _doorRadius = 4;
+  static const Rect _awning = Rect.fromLTWH(282, 84, 44, 8);
+
   void _paintBuilding(Canvas canvas) {
-    const body = Rect.fromLTWH(14, 4, 362, 126);
-    final r = RRect.fromRectAndRadius(body, const Radius.circular(12));
-    canvas.drawRRect(
-      r.shift(const Offset(0, 4)),
-      Paint()..color = const Color(0x22000000),
+    final r = RRect.fromRectAndRadius(
+      _building,
+      const Radius.circular(_buildingRadius),
     );
-    canvas.drawRRect(r, Paint()..color = const Color(0xFFF3F6F9));
+    canvas.drawRRect(
+      r.shift(_buildingShadow),
+      Paint()..color = softShadow,
+    );
+    canvas.drawRRect(r, Paint()..color = buildingWallColor);
     // Roof band.
     canvas.drawRRect(
       RRect.fromRectAndCorners(
-        const Rect.fromLTWH(14, 4, 362, 26),
-        topLeft: const Radius.circular(12),
-        topRight: const Radius.circular(12),
+        Rect.fromLTWH(
+          _building.left,
+          _building.top,
+          _building.width,
+          _roofHeight,
+        ),
+        topLeft: const Radius.circular(_buildingRadius),
+        topRight: const Radius.circular(_buildingRadius),
       ),
-      Paint()..color = const Color(0xFF5D6D80),
+      Paint()..color = buildingRoofColor,
     );
     // Windows.
-    final glass = Paint()..color = const Color(0xFF8DB4D8);
-    for (var i = 0; i < 5; i++) {
+    final glass = Paint()..color = buildingWindowColor;
+    for (var i = 0; i < _windowCount; i++) {
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(30 + i * 52.0, 50, 40, 30),
-          const Radius.circular(4),
+          _firstWindow.translate(i * _windowPitch, 0),
+          const Radius.circular(_windowRadius),
         ),
         glass,
       );
     }
     // Sign and door the queue walks out of.
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(292, 36, 66, 48),
-        const Radius.circular(6),
-      ),
-      Paint()..color = const Color(0xFFD9444A),
+      RRect.fromRectAndRadius(_sign, const Radius.circular(_signRadius)),
+      Paint()..color = buildingSignColor,
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(288, 88, 32, 42),
-        const Radius.circular(4),
-      ),
-      Paint()..color = const Color(0xFF55698C),
+      RRect.fromRectAndRadius(_door, const Radius.circular(_doorRadius)),
+      Paint()..color = buildingDoorColor,
     );
-    canvas.drawRect(
-      const Rect.fromLTWH(282, 84, 44, 8),
-      Paint()..color = const Color(0xFF3F4E6E),
-    );
+    canvas.drawRect(_awning, Paint()..color = buildingAwningColor);
   }
+
+  // Lot tiles: a soft rim under the whole lot, then each tile slightly
+  // overlapping its neighbours so no seams show.
+  static const double _rimSpread = 3;
+  static const double _rimDrop = 2;
+  static const double _tileOverlap = 0.5;
+  static const double _tileLine = 1;
 
   /// The lot: one tile per parking cell, so irregular outlines show.
   void _paintLot(Canvas canvas) {
@@ -77,30 +98,20 @@ class SceneView extends PositionComponent with HasGameReference<BusEscapeGame> {
     final edge = Paint()
       ..color = lotLineColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    final rim = Paint()..color = const Color(0x22000000);
+      ..strokeWidth = _tileLine;
+    final rim = Paint()..color = softShadow;
     for (var r = 0; r < l.rows; r++) {
       for (var c = 0; c < l.cols; c++) {
         if (!level.hasCell(r, c)) continue;
-        final rect = Rect.fromLTWH(
-          l.gridOrigin.x + c * l.cellSize,
-          l.gridOrigin.y + r * l.cellSize,
-          l.cellSize,
-          l.cellSize,
-        );
-        canvas.drawRect(rect.inflate(3).translate(0, 2), rim);
+        final rect = l.cellRect(r, c);
+        canvas.drawRect(rect.inflate(_rimSpread).translate(0, _rimDrop), rim);
       }
     }
     for (var r = 0; r < l.rows; r++) {
       for (var c = 0; c < l.cols; c++) {
         if (!level.hasCell(r, c)) continue;
-        final rect = Rect.fromLTWH(
-          l.gridOrigin.x + c * l.cellSize,
-          l.gridOrigin.y + r * l.cellSize,
-          l.cellSize,
-          l.cellSize,
-        );
-        canvas.drawRect(rect.inflate(0.5), fill);
+        final rect = l.cellRect(r, c);
+        canvas.drawRect(rect.inflate(_tileOverlap), fill);
         canvas.drawRect(rect, edge);
       }
     }

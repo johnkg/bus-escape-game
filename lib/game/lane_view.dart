@@ -10,11 +10,12 @@ import 'bus_escape_game.dart';
 import 'layout.dart';
 import 'palette.dart';
 import 'parked_vehicle_painter.dart';
+import 'layers.dart';
 
 /// Draws the road and the loading lane from core state, plus the timing
 /// tricks (held snapshots, hops) that keep it in step with animations.
 class LaneView extends PositionComponent with HasGameReference<BusEscapeGame> {
-  LaneView() : super(priority: 0);
+  LaneView() : super(priority: Layer.lane);
 
   static const double hopDuration = 0.18;
 

@@ -7,6 +7,8 @@ import 'bus_escape_game.dart';
 import 'layout.dart';
 import 'symbols.dart';
 import 'vehicle_painter.dart';
+import 'layers.dart';
+import 'palette.dart';
 
 class _Person {
   _Person(this.color, this.pos);
@@ -18,7 +20,15 @@ class _Person {
 /// Waiting passengers as little people in a line from the depot door. When
 /// someone leaves for a vehicle the rest glide forward to close the gap.
 class QueueView extends PositionComponent with HasGameReference<BusEscapeGame> {
-  QueueView(this.layout) : super(priority: 5);
+  QueueView(this.layout) : super(priority: Layer.queue);
+
+  /// How quickly people close a gap (per second, exponential).
+  static const double _glideRate = 12;
+
+  // Ground shadow under each person.
+  static const double _shadowDrop = 13;
+  static const double _shadowWidth = 14;
+  static const double _shadowHeight = 5;
 
   final GameLayout layout;
   final List<_Person> _people = [];
@@ -43,7 +53,7 @@ class QueueView extends PositionComponent with HasGameReference<BusEscapeGame> {
 
   @override
   void update(double dt) {
-    final k = 1 - exp(-dt * 12);
+    final k = 1 - exp(-dt * _glideRate);
     for (var i = 0; i < _people.length; i++) {
       final p = _people[i];
       final t = layout.queuePoint(i);
@@ -62,13 +72,15 @@ class QueueView extends PositionComponent with HasGameReference<BusEscapeGame> {
       final person = _people[i];
       final p = person.pos;
       canvas.drawOval(
-        Rect.fromCenter(center: p.translate(0, 13), width: 14, height: 5),
-        Paint()..color = const Color(0x22000000),
+        Rect.fromCenter(
+          center: p.translate(0, _shadowDrop),
+          width: _shadowWidth,
+          height: _shadowHeight,
+        ),
+        Paint()..color = softShadow,
       );
       paintPassenger(canvas, p, person.color);
-      if (game.showSymbols) {
-        paintSymbol(canvas, p.translate(0, 4), 8, symbolFor(person.color));
-      }
+      if (game.showSymbols) paintPersonSymbol(canvas, p, person.color);
     }
   }
 }

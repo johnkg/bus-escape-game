@@ -35,9 +35,20 @@ class GameLayout {
 
   /// How many people fit on the queue path.
   static int get queueVisible =>
-      ((queueRightX - queueFront.dx) + (queueFront.dy - doorY - 8)) ~/
+      ((queueRightX - queueFront.dx) +
+              (queueFront.dy - doorY - _doorClearance)) ~/
           queueSpacing +
       1;
+
+  /// Nobody is drawn closer than this to the depot door.
+  static const double _doorClearance = 8;
+
+  /// The lane and the jam span this width, centred on screen.
+  static const double contentWidth = 350;
+  static const double _sideMargin = (width - contentWidth) / 2;
+
+  /// A jam cell is at most this much wider than a lane bay.
+  static const double _maxCellToBay = 1.15;
 
   static const double roadTop = 240;
   static const double roadHeight = 110;
@@ -54,8 +65,8 @@ class GameLayout {
   /// Jam vehicles are never much wider than a lane bay, so a car looks like
   /// it fits the slot it is driving to.
   late final double cellSize = min(
-    min(350 / cols, jamHeight / rows),
-    _bayWidth * 1.15,
+    min(contentWidth / cols, jamHeight / rows),
+    _bayWidth * _maxCellToBay,
   );
   late final Vector2 gridOrigin = Vector2(
     (width - cols * cellSize) / 2,
@@ -72,12 +83,25 @@ class GameLayout {
 
   static const double _gap = 5;
 
-  double get _bayWidth => (350 - _gap * (slotCount - 1)) / slotCount;
+  double get _bayWidth => (contentWidth - _gap * (slotCount - 1)) / slotCount;
 
   Rect laneSlotRect(int slot) {
     final w = _bayWidth;
-    return Rect.fromLTWH(20 + slot * (w + _gap), laneTop, w, laneHeight);
+    return Rect.fromLTWH(
+      _sideMargin + slot * (w + _gap),
+      laneTop,
+      w,
+      laneHeight,
+    );
   }
+
+  /// The square of jam cell ([row], [col]).
+  Rect cellRect(int row, int col) => Rect.fromLTWH(
+    gridOrigin.x + col * cellSize,
+    gridOrigin.y + row * cellSize,
+    cellSize,
+    cellSize,
+  );
 
   /// Where the [i]-th waiting passenger stands (0 = front).
   Offset queuePoint(int i) {
