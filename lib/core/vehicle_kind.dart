@@ -6,6 +6,9 @@ const int policeColor = 10;
 const int fireColor = 11;
 const int ambulanceColor = 12;
 
+/// How many ordinary passenger / vehicle colors there are (0 until this).
+const int ordinaryColorCount = 6;
+
 bool isServiceColor(int colorIndex) => colorIndex >= policeColor;
 
 /// The only vehicles in the game, told apart by length and color.
@@ -24,12 +27,17 @@ enum VehicleKind {
   fireTruck,
   ambulance;
 
+  /// Lengths in cells; seats are length times [Bus.seatsPerCell].
+  static const int sedanLength = 2;
+  static const int coasterLength = 3;
+  static const int busLength = 5;
+
   static VehicleKind of({required int length, required int colorIndex}) {
     if (colorIndex == policeColor) return VehicleKind.policeCar;
     if (colorIndex == fireColor) return VehicleKind.fireTruck;
     if (colorIndex == ambulanceColor) return VehicleKind.ambulance;
-    if (length <= 2) return VehicleKind.sedan;
-    if (length == 3) return VehicleKind.coaster;
+    if (length <= sedanLength) return VehicleKind.sedan;
+    if (length == coasterLength) return VehicleKind.coaster;
     return VehicleKind.bus;
   }
 }

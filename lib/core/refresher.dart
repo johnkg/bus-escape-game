@@ -1,6 +1,7 @@
 import 'bus.dart';
 import 'direction.dart';
 import 'game_state.dart';
+import 'level.dart';
 import 'rng.dart';
 import 'rules.dart';
 import 'solver.dart';
@@ -25,12 +26,21 @@ class RefreshResult {
 class Refresher {
   const Refresher._();
 
+  /// Search budget for finding a winning order to place against.
+  static const int defaultMaxNodes = 20000;
+
+  /// Whole re-placements tried before giving up.
+  static const int defaultAttempts = 40;
+
+  /// Random spots tried per vehicle within one re-placement.
+  static const int _placementTries = 400;
+
   static RefreshResult? reshuffle(
     GameState s,
     Rng rng, {
     List<int>? fallbackOrder,
-    int maxNodes = 20000,
-    int attempts = 40,
+    int maxNodes = defaultMaxNodes,
+    int attempts = defaultAttempts,
   }) {
     if (s.status != GameStatus.playing || s.buses.length < 2) return null;
     final order = _winningOrder(s, fallbackOrder, maxNodes);
@@ -77,15 +87,7 @@ class Refresher {
   }
 
   static List<Bus>? _place(GameState s, List<int> order, Rng rng) {
-    bool inLot(int r, int c) {
-      final shape = s.shape;
-      if (shape == null) return r >= 0 && r < s.rows && c >= 0 && c < s.cols;
-      return r >= 0 &&
-          r < shape.length &&
-          c >= 0 &&
-          c < shape[r].length &&
-          shape[r][c] == '#';
-    }
+    bool inLot(int r, int c) => lotHasCell(s.shape, s.rows, s.cols, r, c);
 
     final original = {for (final b in s.buses) b.id: b};
     final occupied = <Cell>{};
@@ -94,8 +96,8 @@ class Refresher {
     for (final id in order.reversed) {
       final o = original[id]!;
       Bus? found;
-      for (var t = 0; t < 400 && found == null; t++) {
-        final dir = Direction.values[rng.nextInt(4)];
+      for (var t = 0; t < _placementTries && found == null; t++) {
+        final dir = Direction.values[rng.nextInt(Direction.values.length)];
         final maxRow = dir.isHorizontal ? s.rows : s.rows - o.length + 1;
         final maxCol = dir.isHorizontal ? s.cols - o.length + 1 : s.cols;
         final bus = Bus(

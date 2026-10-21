@@ -9,7 +9,7 @@ class Level {
     required this.cols,
     required this.buses,
     required this.queue,
-    this.laneSlots = 5,
+    this.laneSlots = defaultLaneSlots,
     this.hint,
     this.shape,
     this.solution,
@@ -19,7 +19,7 @@ class Level {
     id: json['id'] as int,
     rows: json['rows'] as int,
     cols: json['cols'] as int,
-    laneSlots: json['laneSlots'] as int? ?? 5,
+    laneSlots: json['laneSlots'] as int? ?? defaultLaneSlots,
     buses: [
       for (final b in json['buses'] as List)
         Bus.fromJson(b as Map<String, dynamic>),
@@ -34,6 +34,13 @@ class Level {
           ]
         : (json['queue'] as List).cast<int>(),
   );
+
+  /// Lane slots when a level does not say otherwise.
+  static const int defaultLaneSlots = 5;
+
+  /// Characters of a [shape] row.
+  static const String lotCell = '#';
+  static const String offLotCell = '.';
 
   final int id;
   final int rows;
@@ -54,15 +61,7 @@ class Level {
   /// Not serialized; levels are deterministic so it can be rebuilt.
   final List<int>? solution;
 
-  bool hasCell(int row, int col) {
-    final s = shape;
-    if (s == null) return row >= 0 && row < rows && col >= 0 && col < cols;
-    return row >= 0 &&
-        row < s.length &&
-        col >= 0 &&
-        col < s[row].length &&
-        s[row][col] == '#';
-  }
+  bool hasCell(int row, int col) => lotHasCell(shape, rows, cols, row, col);
 
   GameState toState() => GameState(
     rows: rows,
@@ -83,4 +82,15 @@ class Level {
     if (hint != null) 'hint': hint,
     if (shape != null) 'shape': shape,
   };
+}
+
+/// Whether ([row], [col]) is a parking cell of a [rows] x [cols] lot with
+/// the optional outline [shape] (see [Level.shape]).
+bool lotHasCell(List<String>? shape, int rows, int cols, int row, int col) {
+  if (shape == null) return row >= 0 && row < rows && col >= 0 && col < cols;
+  return row >= 0 &&
+      row < shape.length &&
+      col >= 0 &&
+      col < shape[row].length &&
+      shape[row][col] == Level.lotCell;
 }
