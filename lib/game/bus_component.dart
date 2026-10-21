@@ -8,7 +8,7 @@ import 'package:flame/events.dart';
 import 'package:flutter/animation.dart';
 
 import 'bus_escape_game.dart';
-import 'lane_view.dart';
+import 'parked_vehicle_painter.dart';
 import 'layout.dart';
 import 'symbols.dart';
 import 'vehicle_painter.dart';

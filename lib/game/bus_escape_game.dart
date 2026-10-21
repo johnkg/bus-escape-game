@@ -15,6 +15,7 @@ import 'departing_bus.dart';
 import 'full_pop.dart';
 import 'lane_delta.dart';
 import 'lane_view.dart';
+import 'parked_vehicle_painter.dart';
 import 'locked_slot_button.dart';
 import 'layout.dart';
 import 'palette.dart';

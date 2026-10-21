@@ -1,26 +1,13 @@
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:flutter/painting.dart' show HSLColor;
-
 import '../core/core.dart';
 import 'palette.dart';
 
-Color shade(Color c, double delta) {
-  final hsl = HSLColor.fromColor(c);
-  return hsl.withLightness((hsl.lightness + delta).clamp(0.0, 1.0)).toColor();
-}
+export 'palette.dart' show shade;
 
 /// How far the roof sits above the base, as a fraction of a cell.
 const double vehicleDepthFactor = 0.17;
-
-const Color _glass = Color(0xE63A526B);
-const Color _policeBlue = Color(0xFF2B4C9B);
-const Color _lightRed = Color(0xFFFF4A4A);
-const Color _lightBlue = Color(0xFF4AA3FF);
-const Color _yellow = Color(0xFFFFD23F);
-const Color _crossRed = Color(0xFFD13B3B);
-const Color _paramedicTeal = Color(0xFF1F9E8F);
 
 /// Maps a vehicle-local (u along its length, v across) into the screen for
 /// a vehicle heading [dir] inside [rect]. u = 0 is the tail, 1 the nose.
@@ -53,10 +40,191 @@ class _Frame {
       Rect.fromPoints(at(u0, v0), at(u1, v1));
 }
 
-void _fill(Canvas canvas, Rect r, Color c, [double radius = 3]) => canvas
-    .drawRRect(RRect.fromRectAndRadius(r, Radius.circular(radius)), Paint()..color = c);
+/// Default corner radius of small painted parts, in pixels.
+const double _partRadius = 3;
 
-/// Draws one of the five vehicles with a little fake depth: a ground shadow,
+void _fill(Canvas canvas, Rect r, Color c, [double radius = _partRadius]) =>
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(r, Radius.circular(radius)),
+      Paint()..color = c,
+    );
+
+/// A rounded rectangle on the roof, in vehicle-local (u, v) coordinates.
+/// A null [color] means a lighter shade of the body.
+class _Panel {
+  const _Panel(
+    this.u0,
+    this.v0,
+    this.u1,
+    this.v1, {
+    this.color,
+    this.radius = _partRadius,
+  });
+
+  final double u0;
+  final double v0;
+  final double u1;
+  final double v1;
+  final Color? color;
+  final double radius;
+}
+
+/// Everything that makes one vehicle kind look like itself in the jam.
+class _VehicleStyle {
+  const _VehicleStyle({
+    required this.cornerFactor,
+    required this.sideWindows,
+    required this.wheels,
+    required this.panels,
+    this.headlightsAt,
+    this.arrowAtTail = false,
+    this.lockers = false,
+    this.ladder = false,
+  });
+
+  /// Corner radius as a share of the short side.
+  final double cornerFactor;
+
+  /// Windows along the side panel (when the long side faces us).
+  final int sideWindows;
+
+  /// Wheel positions along the length (0 = tail, 1 = nose).
+  final List<double> wheels;
+
+  /// Glass and roof details, painted in order.
+  final List<_Panel> panels;
+
+  /// Where along the length the headlights sit, if it has any.
+  final double? headlightsAt;
+
+  /// Service vehicles keep their roof gear clear of the direction arrow.
+  final bool arrowAtTail;
+
+  /// Fire truck: equipment lockers instead of windows, ladder on the roof.
+  final bool lockers;
+  final bool ladder;
+}
+
+// Car-sized glass shared by the sedan, police car and ambulance.
+const _windscreen = _Panel(0.56, 0.1, 0.72, 0.9, color: glassColor);
+const _rearGlass = _Panel(0.2, 0.12, 0.32, 0.88, color: glassColor);
+const _carNose = 0.93;
+const _carWheels = [0.24, 0.76];
+const _carCorner = 0.36;
+const _carSideWindows = 3;
+
+/// Thin parts such as light bars use smaller corners.
+const double _thinRadius = 2;
+const double _hatchRadius = 2.5;
+const double _beaconRadius = 1.5;
+const double _stripeRadius = 1;
+
+const Map<VehicleKind, _VehicleStyle> _styles = {
+  VehicleKind.sedan: _VehicleStyle(
+    cornerFactor: _carCorner,
+    sideWindows: _carSideWindows,
+    wheels: _carWheels,
+    panels: [
+      _windscreen,
+      _rearGlass,
+      _Panel(0.34, 0.14, 0.54, 0.86), // roof panel
+    ],
+    headlightsAt: _carNose,
+  ),
+  VehicleKind.coaster: _VehicleStyle(
+    cornerFactor: 0.28,
+    sideWindows: 5,
+    wheels: _carWheels,
+    panels: [
+      _Panel(0.88, 0.12, 0.97, 0.88, color: glassColor),
+      _Panel(0.03, 0.14, 0.09, 0.86, color: glassColor),
+      _Panel(0.3, 0.2, 0.46, 0.8, radius: _hatchRadius), // roof hatches
+      _Panel(0.54, 0.2, 0.7, 0.8, radius: _hatchRadius),
+    ],
+    headlightsAt: 0.985,
+  ),
+  VehicleKind.bus: _VehicleStyle(
+    cornerFactor: 0.22,
+    sideWindows: 9,
+    wheels: [0.14, 0.5, 0.86],
+    panels: [
+      _Panel(0.93, 0.12, 0.985, 0.88, color: glassColor),
+      _Panel(0.015, 0.14, 0.05, 0.86, color: glassColor),
+      _Panel(0.16, 0.2, 0.3, 0.8, radius: _hatchRadius), // roof units
+      _Panel(0.4, 0.2, 0.54, 0.8, radius: _hatchRadius),
+      _Panel(0.64, 0.2, 0.78, 0.8, radius: _hatchRadius),
+    ],
+    headlightsAt: 0.99,
+  ),
+  VehicleKind.policeCar: _VehicleStyle(
+    cornerFactor: _carCorner,
+    sideWindows: _carSideWindows,
+    wheels: _carWheels,
+    arrowAtTail: true,
+    panels: [
+      _windscreen,
+      _rearGlass,
+      _Panel(0.34, 0.12, 0.54, 0.88, color: policeBlue), // roof
+      _Panel(0.4, 0.2, 0.48, 0.5, color: beaconRed, radius: _thinRadius),
+      _Panel(0.4, 0.5, 0.48, 0.8, color: beaconBlue, radius: _thinRadius),
+      _Panel(0.76, 0.42, 0.9, 0.58, color: policeBlue, radius: _thinRadius),
+    ],
+    headlightsAt: _carNose,
+  ),
+  VehicleKind.ambulance: _VehicleStyle(
+    cornerFactor: _carCorner,
+    sideWindows: _carSideWindows,
+    wheels: _carWheels,
+    arrowAtTail: true,
+    panels: [
+      _windscreen,
+      _rearGlass,
+      // Red cross on the roof.
+      _Panel(0.3, 0.41, 0.55, 0.59, color: crossRed, radius: _beaconRadius),
+      _Panel(0.38, 0.25, 0.47, 0.75, color: crossRed, radius: _beaconRadius),
+      // Beacons.
+      _Panel(0.76, 0.3, 0.82, 0.48, color: beaconRed, radius: _beaconRadius),
+      _Panel(0.76, 0.52, 0.82, 0.7, color: beaconBlue, radius: _beaconRadius),
+    ],
+    headlightsAt: _carNose,
+  ),
+  VehicleKind.fireTruck: _VehicleStyle(
+    cornerFactor: 0.2,
+    sideWindows: 0,
+    wheels: [0.18, 0.5, 0.84],
+    arrowAtTail: true,
+    lockers: true,
+    ladder: true,
+    panels: [
+      _Panel(0.86, 0.12, 0.97, 0.88, color: glassColor), // cab glass
+      _Panel(0.8, 0.3, 0.84, 0.7, color: beaconBlue, radius: _beaconRadius),
+    ],
+  ),
+};
+
+// Shared shading of every jam vehicle.
+const Offset _shadowOffset = Offset(1.5, 2.5);
+const double _shadowSpread = 1;
+const double _sideDarken = -0.2;
+const double _roofLighten = 0.04;
+const double _roofEdgeDarken = -0.22;
+const double _roofEdgeWidth = 1.5;
+const double _roofInset = 0.13; // share of the short side
+const double _roofInsetRadius = 0.2;
+const double _roofInsetLighten = 0.1;
+const double _detailLighten = 0.16;
+const double _outlineDarken = -0.1;
+
+/// Below this depth the side panel is too thin for windows and wheels.
+const double _minSideDetailDepth = 4;
+
+/// The direction arrow: its size as a share of the short side, and where it
+/// sits on service vehicles.
+const double _arrowScale = 0.5;
+const double _tailArrowU = 0.3;
+const double _centreV = 0.5;
+
+/// Draws one of the vehicles with a little fake depth: a ground shadow,
 /// a darker side panel (with windows and wheels when the long side faces
 /// us), and the roof with glass, kind-specific details and, optionally, a
 /// direction arrow.
@@ -73,199 +241,229 @@ Rect paintVehicle(
   bool showArrow = true,
 }) {
   final kind = VehicleKind.of(length: length, colorIndex: colorIndex);
+  final style = _styles[kind]!;
   final color = colorFor(colorIndex);
   final short = min(footprint.width, footprint.height);
-  final cornerFactor = switch (kind) {
-    VehicleKind.sedan || VehicleKind.policeCar || VehicleKind.ambulance => 0.36,
-    VehicleKind.coaster => 0.28,
-    VehicleKind.bus => 0.22,
-    VehicleKind.fireTruck => 0.2,
-  };
-  final radius = Radius.circular(short * cornerFactor);
+  final radius = Radius.circular(short * style.cornerFactor);
 
   final roofRect = footprint.translate(0, -depth / 2);
   final baseRect = footprint.translate(0, depth / 2);
 
   // Shadow on the ground.
   canvas.drawRRect(
-    RRect.fromRectAndRadius(baseRect.translate(1.5, 2.5).inflate(1), radius),
-    Paint()..color = const Color(0x33000000),
+    RRect.fromRectAndRadius(
+      baseRect.shift(_shadowOffset).inflate(_shadowSpread),
+      radius,
+    ),
+    Paint()..color = shadowColor,
   );
 
   // Side panel (darker): windows, wheels.
   final base = RRect.fromRectAndRadius(baseRect, radius);
-  canvas.drawRRect(base, Paint()..color = shade(color, -0.2));
-  if (dir.isHorizontal && depth >= 4) {
-    _paintSide(canvas, baseRect, kind, depth, short);
+  canvas.drawRRect(base, Paint()..color = shade(color, _sideDarken));
+  if (dir.isHorizontal && depth >= _minSideDetailDepth) {
+    _paintSide(canvas, baseRect, style, depth, short);
   }
 
   // Roof.
   final roof = RRect.fromRectAndRadius(roofRect, radius);
-  canvas.drawRRect(roof, Paint()..color = shade(color, 0.04));
+  canvas.drawRRect(roof, Paint()..color = shade(color, _roofLighten));
   canvas.drawRRect(
     roof,
     Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..color = shade(color, -0.22),
+      ..strokeWidth = _roofEdgeWidth
+      ..color = shade(color, _roofEdgeDarken),
   );
   canvas.drawRRect(
     RRect.fromRectAndRadius(
-      roofRect.deflate(short * 0.13),
-      Radius.circular(short * 0.2),
+      roofRect.deflate(short * _roofInset),
+      Radius.circular(short * _roofInsetRadius),
     ),
-    Paint()..color = shade(color, 0.1),
+    Paint()..color = shade(color, _roofInsetLighten),
   );
 
   final f = _Frame(roofRect, dir);
-  _paintRoofDetails(canvas, f, kind, color);
+  _paintRoofDetails(canvas, f, style, color);
   if (showArrow) {
-    final c = switch (kind) {
-      VehicleKind.policeCar ||
-      VehicleKind.fireTruck ||
-      VehicleKind.ambulance => f.at(0.3, 0.5),
-      _ => roofRect.center,
-    };
-    _paintArrow(canvas, c, short * 0.5, dir);
+    final c = style.arrowAtTail
+        ? f.at(_tailArrowU, _centreV)
+        : roofRect.center;
+    _paintArrow(canvas, c, short * _arrowScale, dir);
   }
   return roofRect;
 }
 
+// Side panel layout, as shares of the short side, the depth or a slot.
+const double _sideEndMargin = 0.25;
+const double _windowGap = 0.12;
+const double _windowWidth = 0.76;
+const double _windowTop = 0.85;
+const double _windowHeight = 0.55;
+const double _windowRadius = 1.5;
+const int _lockerCount = 3;
+const double _lockerEndMargin = 0.15;
+const double _lockerGap = 0.1;
+const double _lockerWidth = 0.8;
+const double _wheelRadius = 0.42;
+const double _wheelSink = 0.2;
+const double _hubRadius = 0.4;
+
 void _paintSide(
   Canvas canvas,
   Rect baseRect,
-  VehicleKind kind,
+  _VehicleStyle style,
   double depth,
   double short,
 ) {
-  final n = switch (kind) {
-    VehicleKind.sedan || VehicleKind.policeCar || VehicleKind.ambulance => 3,
-    VehicleKind.coaster => 5,
-    VehicleKind.bus => 9,
-    VehicleKind.fireTruck => 0,
-  };
-  if (n > 0) {
-    final slot = (baseRect.width - short * 0.5) / n;
+  final n = style.sideWindows;
+  if (!style.lockers) {
+    final slot = (baseRect.width - short * _sideEndMargin * 2) / n;
     for (var i = 0; i < n; i++) {
-      final x = baseRect.left + short * 0.25 + i * slot + slot * 0.12;
+      final x =
+          baseRect.left + short * _sideEndMargin + i * slot + slot * _windowGap;
       _fill(
         canvas,
         Rect.fromLTWH(
           x,
-          baseRect.bottom - depth * 0.85,
-          slot * 0.76,
-          depth * 0.55,
+          baseRect.bottom - depth * _windowTop,
+          slot * _windowWidth,
+          depth * _windowHeight,
         ),
-        const Color(0xFFCFE6F7),
-        1.5,
+        sideWindowColor,
+        _windowRadius,
       );
     }
   } else {
-    // Fire truck: equipment lockers.
-    for (var i = 0; i < 3; i++) {
-      final w = (baseRect.width - short) / 3;
+    for (var i = 0; i < _lockerCount; i++) {
+      final w = (baseRect.width - short) / _lockerCount;
       _fill(
         canvas,
         Rect.fromLTWH(
-          baseRect.left + short * 0.15 + i * w + w * 0.1,
-          baseRect.bottom - depth * 0.85,
-          w * 0.8,
-          depth * 0.55,
+          baseRect.left + short * _lockerEndMargin + i * w + w * _lockerGap,
+          baseRect.bottom - depth * _windowTop,
+          w * _lockerWidth,
+          depth * _windowHeight,
         ),
-        const Color(0x55000000),
-        1.5,
+        outlineShadow,
+        _windowRadius,
       );
     }
   }
   // Wheels peeking out at the bottom edge.
-  final wheels = switch (kind) {
-    VehicleKind.bus => const [0.14, 0.5, 0.86],
-    VehicleKind.fireTruck => const [0.18, 0.5, 0.84],
-    _ => const [0.24, 0.76],
-  };
-  final r = depth * 0.42;
-  for (final u in wheels) {
-    final c = Offset(baseRect.left + baseRect.width * u, baseRect.bottom - r * 0.2);
-    canvas.drawCircle(c, r, Paint()..color = const Color(0xFF2A2F36));
-    canvas.drawCircle(c, r * 0.4, Paint()..color = const Color(0xFF9AA4AE));
+  final r = depth * _wheelRadius;
+  for (final u in style.wheels) {
+    final c = Offset(
+      baseRect.left + baseRect.width * u,
+      baseRect.bottom - r * _wheelSink,
+    );
+    canvas.drawCircle(c, r, Paint()..color = tyreColor);
+    canvas.drawCircle(c, r * _hubRadius, Paint()..color = steelColor);
   }
 }
 
-void _paintRoofDetails(Canvas canvas, _Frame f, VehicleKind kind, Color color) {
-  final light = shade(color, 0.16);
-  final dark = shade(color, -0.1);
-  switch (kind) {
-    case VehicleKind.sedan:
-      _fill(canvas, f.box(0.56, 0.1, 0.72, 0.9), _glass, 3); // windscreen
-      _fill(canvas, f.box(0.2, 0.12, 0.32, 0.88), _glass, 3); // rear glass
-      _fill(canvas, f.box(0.34, 0.14, 0.54, 0.86), light, 3); // roof panel
-      _headlights(canvas, f, 0.93);
-    case VehicleKind.coaster:
-      _fill(canvas, f.box(0.88, 0.12, 0.97, 0.88), _glass, 3);
-      _fill(canvas, f.box(0.03, 0.14, 0.09, 0.86), _glass, 3);
-      _fill(canvas, f.box(0.3, 0.2, 0.46, 0.8), light, 2.5); // hatch
-      _fill(canvas, f.box(0.54, 0.2, 0.7, 0.8), light, 2.5);
-      _headlights(canvas, f, 0.985);
-    case VehicleKind.bus:
-      _fill(canvas, f.box(0.93, 0.12, 0.985, 0.88), _glass, 3);
-      _fill(canvas, f.box(0.015, 0.14, 0.05, 0.86), _glass, 3);
-      _fill(canvas, f.box(0.16, 0.2, 0.3, 0.8), light, 2.5); // roof units
-      _fill(canvas, f.box(0.4, 0.2, 0.54, 0.8), light, 2.5);
-      _fill(canvas, f.box(0.64, 0.2, 0.78, 0.8), light, 2.5);
-      _headlights(canvas, f, 0.99);
-    case VehicleKind.policeCar:
-      _fill(canvas, f.box(0.56, 0.1, 0.72, 0.9), _glass, 3);
-      _fill(canvas, f.box(0.2, 0.12, 0.32, 0.88), _glass, 3);
-      _fill(canvas, f.box(0.34, 0.12, 0.54, 0.88), _policeBlue, 3); // roof
-      _fill(canvas, f.box(0.4, 0.2, 0.48, 0.5), _lightRed, 2); // light bar
-      _fill(canvas, f.box(0.4, 0.5, 0.48, 0.8), _lightBlue, 2);
-      _fill(canvas, f.box(0.76, 0.42, 0.9, 0.58), _policeBlue, 2); // hood
-      _headlights(canvas, f, 0.93);
-    case VehicleKind.ambulance:
-      _fill(canvas, f.box(0.56, 0.1, 0.72, 0.9), _glass, 3);
-      _fill(canvas, f.box(0.2, 0.12, 0.32, 0.88), _glass, 3);
-      // Red cross on the roof.
-      _fill(canvas, f.box(0.3, 0.41, 0.55, 0.59), _crossRed, 1.5);
-      _fill(canvas, f.box(0.38, 0.25, 0.47, 0.75), _crossRed, 1.5);
-      _fill(canvas, f.box(0.76, 0.3, 0.82, 0.48), _lightRed, 1.5); // beacons
-      _fill(canvas, f.box(0.76, 0.52, 0.82, 0.7), _lightBlue, 1.5);
-      _headlights(canvas, f, 0.93);
-    case VehicleKind.fireTruck:
-      _fill(canvas, f.box(0.86, 0.12, 0.97, 0.88), _glass, 3); // cab glass
-      _fill(canvas, f.box(0.8, 0.3, 0.84, 0.7), _lightBlue, 1.5); // beacon
-      // Ladder on top: two rails and rungs.
-      final rail = Paint()
-        ..color = const Color(0xFFCFD6DD)
-        ..strokeWidth = 2.2
-        ..strokeCap = StrokeCap.round;
-      canvas.drawLine(f.at(0.08, 0.3), f.at(0.74, 0.3), rail);
-      canvas.drawLine(f.at(0.08, 0.7), f.at(0.74, 0.7), rail);
-      final rung = Paint()
-        ..color = const Color(0xFF9AA4AE)
-        ..strokeWidth = 1.4;
-      for (var i = 0; i < 7; i++) {
-        final u = 0.12 + i * 0.1;
-        canvas.drawLine(f.at(u, 0.3), f.at(u, 0.7), rung);
-      }
-      _fill(canvas, f.box(0.76, 0.12, 0.79, 0.88), _yellow, 1); // stripe
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          f.box(0.04, 0.12, 0.78, 0.88),
-          const Radius.circular(3),
-        ),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = dark,
-      );
+void _paintRoofDetails(
+  Canvas canvas,
+  _Frame f,
+  _VehicleStyle style,
+  Color color,
+) {
+  final light = shade(color, _detailLighten);
+  for (final p in style.panels) {
+    _fill(canvas, f.box(p.u0, p.v0, p.u1, p.v1), p.color ?? light, p.radius);
   }
+  if (style.ladder) _paintLadder(canvas, f, shade(color, _outlineDarken));
+  final nose = style.headlightsAt;
+  if (nose != null) _headlights(canvas, f, nose);
 }
+
+// Fire truck ladder, in vehicle-local coordinates.
+const double _ladderTail = 0.08;
+const double _ladderHead = 0.74;
+const double _ladderLeft = 0.3;
+const double _ladderRight = 0.7;
+const double _railWidth = 2.2;
+const double _rungWidth = 1.4;
+const int _rungCount = 7;
+const double _firstRung = 0.12;
+const double _rungSpacing = 0.1;
+const _hiVisStripe = _Panel(
+  0.76,
+  0.12,
+  0.79,
+  0.88,
+  color: hiVisYellow,
+  radius: _stripeRadius,
+);
+const _ladderBay = _Panel(0.04, 0.12, 0.78, 0.88);
+const double _ladderBayEdge = 1;
+
+void _paintLadder(Canvas canvas, _Frame f, Color outline) {
+  final rail = Paint()
+    ..color = ladderRailColor
+    ..strokeWidth = _railWidth
+    ..strokeCap = StrokeCap.round;
+  canvas.drawLine(
+    f.at(_ladderTail, _ladderLeft),
+    f.at(_ladderHead, _ladderLeft),
+    rail,
+  );
+  canvas.drawLine(
+    f.at(_ladderTail, _ladderRight),
+    f.at(_ladderHead, _ladderRight),
+    rail,
+  );
+  final rung = Paint()
+    ..color = steelColor
+    ..strokeWidth = _rungWidth;
+  for (var i = 0; i < _rungCount; i++) {
+    final u = _firstRung + i * _rungSpacing;
+    canvas.drawLine(f.at(u, _ladderLeft), f.at(u, _ladderRight), rung);
+  }
+  const s = _hiVisStripe;
+  _fill(canvas, f.box(s.u0, s.v0, s.u1, s.v1), s.color!, s.radius);
+  const b = _ladderBay;
+  canvas.drawRRect(
+    RRect.fromRectAndRadius(
+      f.box(b.u0, b.v0, b.u1, b.v1),
+      const Radius.circular(_partRadius),
+    ),
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = _ladderBayEdge
+      ..color = outline,
+  );
+}
+
+// Headlights: a short strip at each front corner.
+const double _headlightLength = 0.035;
+const double _headlightInner = 0.08;
+const double _headlightOuter = 0.28;
+const double _headlightRadius = 1.2;
 
 void _headlights(Canvas canvas, _Frame f, double u) {
-  const c = Color(0xFFFFF3B0);
-  _fill(canvas, f.box(u - 0.035, 0.08, u, 0.28), c, 1.2);
-  _fill(canvas, f.box(u - 0.035, 0.72, u, 0.92), c, 1.2);
+  final tail = u - _headlightLength;
+  _fill(
+    canvas,
+    f.box(tail, _headlightInner, u, _headlightOuter),
+    headlightColor,
+    _headlightRadius,
+  );
+  _fill(
+    canvas,
+    f.box(tail, 1 - _headlightOuter, u, 1 - _headlightInner),
+    headlightColor,
+    _headlightRadius,
+  );
 }
+
+// Direction arrow outline, as shares of its size (pointing east).
+const double _arrowTail = 0.5;
+const double _arrowShaft = 0.13;
+const double _arrowNeck = 0.08;
+const double _arrowHead = 0.36;
+const double _arrowTip = 0.55;
+const double _arrowOutline = 2;
 
 void _paintArrow(Canvas canvas, Offset c, double size, Direction dir) {
   final angle = switch (dir) {
@@ -276,13 +474,13 @@ void _paintArrow(Canvas canvas, Offset c, double size, Direction dir) {
   };
   final s = size;
   final path = Path()
-    ..moveTo(-s * 0.5, -s * 0.13)
-    ..lineTo(s * 0.08, -s * 0.13)
-    ..lineTo(s * 0.08, -s * 0.36)
-    ..lineTo(s * 0.55, 0)
-    ..lineTo(s * 0.08, s * 0.36)
-    ..lineTo(s * 0.08, s * 0.13)
-    ..lineTo(-s * 0.5, s * 0.13)
+    ..moveTo(-s * _arrowTail, -s * _arrowShaft)
+    ..lineTo(s * _arrowNeck, -s * _arrowShaft)
+    ..lineTo(s * _arrowNeck, -s * _arrowHead)
+    ..lineTo(s * _arrowTip, 0)
+    ..lineTo(s * _arrowNeck, s * _arrowHead)
+    ..lineTo(s * _arrowNeck, s * _arrowShaft)
+    ..lineTo(-s * _arrowTail, s * _arrowShaft)
     ..close();
   canvas.save();
   canvas.translate(c.dx, c.dy);
@@ -291,12 +489,56 @@ void _paintArrow(Canvas canvas, Offset c, double size, Direction dir) {
     path,
     Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
+      ..strokeWidth = _arrowOutline
       ..strokeJoin = StrokeJoin.round
-      ..color = const Color(0x55000000),
+      ..color = outlineShadow,
   );
-  canvas.drawPath(path, Paint()..color = const Color(0xFFFFFFFF));
+  canvas.drawPath(path, Paint()..color = white);
   canvas.restore();
+}
+
+/// Passenger figure dimensions at scale 1, in pixels, measured from the
+/// centre of the body.
+abstract final class _Person {
+  static const double headRise = 5.5;
+  static const double headRadius = 5;
+  static const double faceRadius = 4.2;
+  static const double bodyDrop = 4;
+  static const double bodyWidth = 11;
+  static const double bodyHeight = 13;
+  static const double bodyRadius = 4;
+  static const double outline = 1;
+  static const double outlineDarken = -0.2;
+
+  // Police cap (crown and peak) and badge.
+  static const double capRise = 3.2;
+  static const double capWidth = 10;
+  static const double capHeight = 4.2;
+  static const double capRadius = 2;
+  static const double peakRise = 1.2;
+  static const double peakWidth = 11;
+  static const double peakHeight = 1.6;
+  static const double peakRadius = 1;
+  static const Offset badge = Offset(2.5, 2.5);
+  static const double badgeRadius = 1.3;
+
+  // Paramedic cap and firefighter helmet: a half dome over the head.
+  static const double domeRise = 0.6;
+  static const double domeWidth = 11;
+  static const double domeHeight = 10;
+  static const double crossRise = 3;
+  static const double crossArm = 1.6;
+  static const double crossWidth = 1.3;
+  static const double helmetBandRise = 0.5;
+  static const double helmetBandWidth = 12;
+  static const double helmetBandHeight = 1.4;
+  static const double helmetBandRadius = 0.7;
+
+  // Chest band (paramedic red, firefighter reflective yellow).
+  static const double bandDrop = 5.5;
+  static const double bandWidth = 11;
+  static const double bandHeight = 2;
+  static const double bandRadius = 0.8;
 }
 
 /// A little passenger standing at [c] (center of the body). Ordinary
@@ -316,133 +558,115 @@ void paintPassenger(
   final police = colorIndex == policeColor;
   final paramedic = colorIndex == ambulanceColor;
   final bodyColor = police
-      ? _policeBlue
+      ? policeBlue
       : paramedic
-      ? _paramedicTeal
-      : const Color(0xFF3A3F47);
+      ? paramedicTeal
+      : firefighterCoat;
   paintPerson(canvas, c, bodyColor, scale: scale);
-  final head = c.translate(0, -5.5 * scale);
-  // Face.
-  canvas.drawCircle(head, 4.2 * scale, Paint()..color = const Color(0xFFF1C9A0));
+  final head = c.translate(0, -_Person.headRise * scale);
+  canvas.drawCircle(
+    head,
+    _Person.faceRadius * scale,
+    Paint()..color = skinColor,
+  );
   if (police) {
     // Cap with a peak and a gold badge.
     _fill(
       canvas,
       Rect.fromCenter(
-        center: head.translate(0, -3.2 * scale),
-        width: 10 * scale,
-        height: 4.2 * scale,
+        center: head.translate(0, -_Person.capRise * scale),
+        width: _Person.capWidth * scale,
+        height: _Person.capHeight * scale,
       ),
-      const Color(0xFF1B2F66),
-      2 * scale,
+      policeCapColor,
+      _Person.capRadius * scale,
     );
     _fill(
       canvas,
       Rect.fromCenter(
-        center: head.translate(0, -1.2 * scale),
-        width: 11 * scale,
-        height: 1.6 * scale,
+        center: head.translate(0, -_Person.peakRise * scale),
+        width: _Person.peakWidth * scale,
+        height: _Person.peakHeight * scale,
       ),
-      const Color(0xFF1B2F66),
-      1 * scale,
+      policeCapColor,
+      _Person.peakRadius * scale,
     );
     canvas.drawCircle(
-      c.translate(2.5 * scale, 2.5 * scale),
-      1.3 * scale,
-      Paint()..color = _yellow,
+      c + _Person.badge * scale,
+      _Person.badgeRadius * scale,
+      Paint()..color = hiVisYellow,
     );
   } else if (paramedic) {
     // White cap with a small red cross, and a red band on the chest.
-    canvas.drawArc(
-      Rect.fromCenter(
-        center: head.translate(0, -0.6 * scale),
-        width: 11 * scale,
-        height: 10 * scale,
-      ),
-      pi,
-      pi,
-      true,
-      Paint()..color = const Color(0xFFFFFFFF),
-    );
-    final cap = head.translate(0, -3 * scale);
+    _paintDome(canvas, head, scale, white);
+    final cap = head.translate(0, -_Person.crossRise * scale);
+    final arm = _Person.crossArm * scale;
     final cross = Paint()
-      ..color = _crossRed
-      ..strokeWidth = 1.3 * scale;
-    canvas.drawLine(cap.translate(-1.6 * scale, 0), cap.translate(1.6 * scale, 0), cross);
-    canvas.drawLine(cap.translate(0, -1.6 * scale), cap.translate(0, 1.6 * scale), cross);
-    _fill(
-      canvas,
-      Rect.fromCenter(
-        center: c.translate(0, 5.5 * scale),
-        width: 11 * scale,
-        height: 2 * scale,
-      ),
-      _crossRed,
-      0.8 * scale,
-    );
+      ..color = crossRed
+      ..strokeWidth = _Person.crossWidth * scale;
+    canvas.drawLine(cap.translate(-arm, 0), cap.translate(arm, 0), cross);
+    canvas.drawLine(cap.translate(0, -arm), cap.translate(0, arm), cross);
+    _paintChestBand(canvas, c, scale, crossRed);
   } else {
     // Helmet and reflective stripe.
-    canvas.drawArc(
-      Rect.fromCenter(
-        center: head.translate(0, -0.6 * scale),
-        width: 11 * scale,
-        height: 10 * scale,
-      ),
-      pi,
-      pi,
-      true,
-      Paint()..color = _yellow,
-    );
+    _paintDome(canvas, head, scale, hiVisYellow);
     _fill(
       canvas,
       Rect.fromCenter(
-        center: head.translate(0, -0.5 * scale),
-        width: 12 * scale,
-        height: 1.4 * scale,
+        center: head.translate(0, -_Person.helmetBandRise * scale),
+        width: _Person.helmetBandWidth * scale,
+        height: _Person.helmetBandHeight * scale,
       ),
-      const Color(0xFFD13B3B),
-      0.7 * scale,
+      crossRed,
+      _Person.helmetBandRadius * scale,
     );
-    _fill(
-      canvas,
-      Rect.fromCenter(
-        center: c.translate(0, 5.5 * scale),
-        width: 11 * scale,
-        height: 2 * scale,
-      ),
-      _yellow,
-      0.8 * scale,
-    );
+    _paintChestBand(canvas, c, scale, hiVisYellow);
   }
 }
 
+void _paintDome(Canvas canvas, Offset head, double scale, Color color) =>
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: head.translate(0, -_Person.domeRise * scale),
+        width: _Person.domeWidth * scale,
+        height: _Person.domeHeight * scale,
+      ),
+      pi,
+      pi,
+      true,
+      Paint()..color = color,
+    );
+
+void _paintChestBand(Canvas canvas, Offset c, double scale, Color color) =>
+    _fill(
+      canvas,
+      Rect.fromCenter(
+        center: c.translate(0, _Person.bandDrop * scale),
+        width: _Person.bandWidth * scale,
+        height: _Person.bandHeight * scale,
+      ),
+      color,
+      _Person.bandRadius * scale,
+    );
+
 /// A little stick-figure passenger standing at [c] (center of the body).
 void paintPerson(Canvas canvas, Offset c, Color color, {double scale = 1}) {
-  final dark = shade(color, -0.2);
+  final dark = shade(color, _Person.outlineDarken);
+  final outline = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = _Person.outline
+    ..color = dark;
   final body = RRect.fromRectAndRadius(
     Rect.fromCenter(
-      center: c.translate(0, 4 * scale),
-      width: 11 * scale,
-      height: 13 * scale,
+      center: c.translate(0, _Person.bodyDrop * scale),
+      width: _Person.bodyWidth * scale,
+      height: _Person.bodyHeight * scale,
     ),
-    Radius.circular(4 * scale),
+    Radius.circular(_Person.bodyRadius * scale),
   );
   canvas.drawRRect(body, Paint()..color = color);
-  canvas.drawRRect(
-    body,
-    Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = dark,
-  );
-  final head = c.translate(0, -5.5 * scale);
-  canvas.drawCircle(head, 5 * scale, Paint()..color = color);
-  canvas.drawCircle(
-    head,
-    5 * scale,
-    Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = dark,
-  );
+  canvas.drawRRect(body, outline);
+  final head = c.translate(0, -_Person.headRise * scale);
+  canvas.drawCircle(head, _Person.headRadius * scale, Paint()..color = color);
+  canvas.drawCircle(head, _Person.headRadius * scale, outline);
 }

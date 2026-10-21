@@ -4,7 +4,7 @@ import 'package:flame/components.dart';
 
 import '../core/core.dart';
 import 'bus_escape_game.dart';
-import 'lane_view.dart';
+import 'parked_vehicle_painter.dart';
 
 /// A full bus pulling away from the lane: slides up and fades out.
 class DepartingBus extends PositionComponent
