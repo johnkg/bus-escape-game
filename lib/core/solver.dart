@@ -30,10 +30,7 @@ class Solver {
   /// Default search budget: enough for any generated level.
   static const int defaultMaxNodes = 200000;
 
-  static SolveResult solve(
-    GameState start, {
-    int maxNodes = defaultMaxNodes,
-  }) {
+  static SolveResult solve(GameState start, {int maxNodes = defaultMaxNodes}) {
     final dead = <String>{};
     final path = <int>[];
     var nodes = 0;

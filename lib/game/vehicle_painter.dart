@@ -286,9 +286,7 @@ Rect paintVehicle(
   final f = _Frame(roofRect, dir);
   _paintRoofDetails(canvas, f, style, color);
   if (showArrow) {
-    final c = style.arrowAtTail
-        ? f.at(_tailArrowU, _centreV)
-        : roofRect.center;
+    final c = style.arrowAtTail ? f.at(_tailArrowU, _centreV) : roofRect.center;
     _paintArrow(canvas, c, short * _arrowScale, dir);
   }
   return roofRect;

@@ -151,10 +151,7 @@ class _GameScreenState extends State<GameScreen> {
       return;
     }
     final previous = progress.stars(widget.levelNumber);
-    var coins = ProgressService.winCoins(
-      previousStars: previous,
-      stars: stars,
-    );
+    var coins = ProgressService.winCoins(previousStars: previous, stars: stars);
     final fast = _game.timeFraction >= ProgressService.fastFinishShare;
     if (fast && coins > 0) coins += ProgressService.fastFinishCoins;
     setState(() {
@@ -191,9 +188,9 @@ class _GameScreenState extends State<GameScreen> {
   static const Duration _snackDuration = Duration(seconds: 2);
 
   void _snack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: _snackDuration),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), duration: _snackDuration));
   }
 
   Future<void> _useRefresh() async {

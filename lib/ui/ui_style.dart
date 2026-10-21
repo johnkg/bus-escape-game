@@ -59,7 +59,10 @@ abstract final class FontSizes {
 }
 
 /// Shadow behind white text drawn over the game.
-const List<Shadow> textOverGame = [Shadow(blurRadius: 3, color: Colors.black87)];
+const List<Shadow> textOverGame = [
+  Shadow(blurRadius: _textShadowBlur, color: Colors.black87),
+];
+const double _textShadowBlur = 3;
 
 /// Rim of the green game buttons.
 const BorderSide buttonRim = BorderSide(color: AppColors.frame, width: 2);

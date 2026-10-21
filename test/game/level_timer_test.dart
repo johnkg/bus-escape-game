@@ -18,10 +18,13 @@ void main() {
     expect(t.fraction, closeTo(0.75, 1e-9));
 
     var expiring = 0;
-    t.tick(8, onExpiring: () {
-      expiring++;
-      expect(t.timeUp.value, isFalse, reason: 'runs before timeUp flips');
-    });
+    t.tick(
+      8,
+      onExpiring: () {
+        expiring++;
+        expect(t.timeUp.value, isFalse, reason: 'runs before timeUp flips');
+      },
+    );
     expect(t.timeLeft.value, 0);
     expect(t.timeUp.value, isTrue);
     t.tick(1, onExpiring: () => expiring++);

@@ -14,12 +14,15 @@ class FullPop extends PositionComponent with HasGameReference<BusEscapeGame> {
 
   static const double duration = 0.8;
 
+  static const double _fontSize = 15;
+  static const double _shadowBlur = 3;
+
   static final _text = TextPaint(
     style: const TextStyle(
       color: white,
-      fontSize: 15,
+      fontSize: _fontSize,
       fontWeight: FontWeight.w900,
-      shadows: [Shadow(color: textShadow, blurRadius: 3)],
+      shadows: [Shadow(color: textShadow, blurRadius: _shadowBlur)],
     ),
   );
 

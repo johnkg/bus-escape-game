@@ -41,10 +41,7 @@ class SceneView extends PositionComponent with HasGameReference<BusEscapeGame> {
       _building,
       const Radius.circular(_buildingRadius),
     );
-    canvas.drawRRect(
-      r.shift(_buildingShadow),
-      Paint()..color = softShadow,
-    );
+    canvas.drawRRect(r.shift(_buildingShadow), Paint()..color = softShadow);
     canvas.drawRRect(r, Paint()..color = buildingWallColor);
     // Roof band.
     canvas.drawRRect(

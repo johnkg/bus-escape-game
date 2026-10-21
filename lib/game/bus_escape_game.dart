@@ -608,8 +608,8 @@ class BusEscapeGame extends FlameGame {
     final offsets = _eventOffsets(events, delta, from);
     final last = offsets.isEmpty ? 0.0 : offsets.last;
     return Duration(
-      milliseconds:
-          ((lead + last + tail) * Duration.millisecondsPerSecond).round(),
+      milliseconds: ((lead + last + tail) * Duration.millisecondsPerSecond)
+          .round(),
     );
   }
 
@@ -703,9 +703,7 @@ class BusEscapeGame extends FlameGame {
     final immediate = _claimBay(bay, id);
     final launchAt = max(_clock, _lastLaunch + _launchGap);
     _lastLaunch = launchAt;
-    final flight = airlift
-        ? BusComponent.liftSeconds
-        : comp.flightSeconds(bay);
+    final flight = airlift ? BusComponent.liftSeconds : comp.flightSeconds(bay);
     // A vehicle held back for a bay that is still emptying arrives later.
     final wait = immediate ? 0.0 : _kerbWaitSeconds;
 

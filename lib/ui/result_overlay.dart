@@ -92,7 +92,9 @@ class ResultOverlay extends StatelessWidget {
               ),
             ),
           if (fast)
-            const _Bonus('Fast finish: +${ProgressService.fastFinishCoins} coins'),
+            const _Bonus(
+              'Fast finish: +${ProgressService.fastFinishCoins} coins',
+            ),
           if (daily && streak > 0)
             _Bonus('$streak-day streak. Come back tomorrow!'),
           if (rewarded) const _Bonus('Bonus: +1 of every booster'),

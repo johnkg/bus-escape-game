@@ -137,7 +137,8 @@ class BusComponent extends PositionComponent
     final cell = layout.cellSize;
     final long = bus.length * cell;
     final halfShort = cell / 2;
-    final start = layout.gridOrigin +
+    final start =
+        layout.gridOrigin +
         Vector2(
           (bus.col + (bus.dir.isHorizontal ? bus.length : 1) / 2) * cell,
           (bus.row + (bus.dir.isHorizontal ? 1 : bus.length) / 2) * cell,

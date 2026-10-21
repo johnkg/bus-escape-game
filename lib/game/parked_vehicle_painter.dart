@@ -199,11 +199,12 @@ void paintLaneVehicle(
 // Seats-left badge on the top corner.
 const double _badgeRadius = 8;
 const double _badgeOverhang = 1;
+const double _badgeFontSize = 11;
 
 final _seatsText = TextPaint(
   style: const TextStyle(
     color: badgeTextColor,
-    fontSize: 11,
+    fontSize: _badgeFontSize,
     fontWeight: FontWeight.w900,
   ),
 );

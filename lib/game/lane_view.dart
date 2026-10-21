@@ -19,6 +19,8 @@ class LaneView extends PositionComponent with HasGameReference<BusEscapeGame> {
 
   static const double hopDuration = 0.18;
 
+  static const double _priceFontSize = 10;
+
   /// How high a vehicle bobs when a passenger lands in it.
   static const double _hopHeight = 4;
 
@@ -61,7 +63,7 @@ class LaneView extends PositionComponent with HasGameReference<BusEscapeGame> {
   static final _unlockText = TextPaint(
     style: const TextStyle(
       color: white,
-      fontSize: 10,
+      fontSize: _priceFontSize,
       fontWeight: FontWeight.bold,
     ),
   );
@@ -113,10 +115,7 @@ class LaneView extends PositionComponent with HasGameReference<BusEscapeGame> {
     );
     canvas.drawRect(road, Paint()..color = roadColor);
     final edge = Paint()..color = roadEdgeColor;
-    canvas.drawRect(
-      Rect.fromLTWH(0, road.top, road.width, _kerbHeight),
-      edge,
-    );
+    canvas.drawRect(Rect.fromLTWH(0, road.top, road.width, _kerbHeight), edge);
     canvas.drawRect(
       Rect.fromLTWH(0, road.bottom - _kerbHeight, road.width, _kerbHeight),
       edge,
