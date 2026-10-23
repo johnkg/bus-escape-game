@@ -8,7 +8,8 @@ import 'package:flame/events.dart';
 import 'package:flutter/animation.dart';
 
 import 'bus_escape_game.dart';
-import 'lane_view.dart';
+import 'parked_vehicle_painter.dart';
+import 'layers.dart';
 import 'layout.dart';
 import 'symbols.dart';
 import 'vehicle_painter.dart';
@@ -16,14 +17,14 @@ import 'vehicle_painter.dart';
 /// A bus sitting on the grid. Tapping asks the game to drive it out.
 class BusComponent extends PositionComponent
     with TapCallbacks, HasGameReference<BusEscapeGame> {
-  BusComponent(this.bus) : super(priority: 10 + _bottomRow(bus));
+  BusComponent(this.bus) : super(priority: Layer.jam + _bottomRow(bus));
 
   /// Lower rows draw later so a vehicle's side panel overlaps the one below.
   static int _bottomRow(Bus bus) =>
       bus.dir.isHorizontal ? bus.row : bus.row + bus.length - 1;
 
   /// Vehicles in transit draw above the grid; later ones above earlier ones.
-  static int _flyPriority = 200;
+  static int _flyPriority = Layer.flying;
 
   final Bus bus;
   Vector2? _home;
@@ -33,7 +34,10 @@ class BusComponent extends PositionComponent
 
   bool get isHinted => _hintLeft > 0;
 
-  void highlight() => _hintLeft = 3;
+  void highlight() => _hintLeft = _hintSeconds;
+
+  /// How long a hint keeps a vehicle glowing.
+  static const double _hintSeconds = 3;
 
   @override
   void update(double dt) {
@@ -65,8 +69,11 @@ class BusComponent extends PositionComponent
   /// How long [exitToLane] takes in total; later effects are timed from it.
   double flightSeconds(int slot) => _flightTime(_routeTo(slot));
 
+  /// Extra time on every drive for pulling away and parking.
+  static const double _pullAwaySeconds = 0.15;
+
   static double _flightTime(List<Vector2> route) =>
-      0.15 + _routeLength(route) / _driveSpeed;
+      _pullAwaySeconds + _routeLength(route) / _driveSpeed;
 
   static double _routeLength(List<Vector2> route) {
     var total = 0.0;
@@ -116,6 +123,12 @@ class BusComponent extends PositionComponent
   bool _inBay = false;
   VoidCallback? _onArrived;
 
+  /// Room a vehicle leaves between itself and the lot, or the screen edge,
+  /// when it turns; route points closer than [_minStep] are merged.
+  static const double _lotClearance = 6;
+  static const double _edgeMargin = 4;
+  static const double _minStep = 0.5;
+
   /// Centre-point route: out of the lot along the vehicle's direction, round
   /// to the drive strip below the bays, along it, then up into [slot].
   List<Vector2> _routeTo(int slot) {
@@ -124,7 +137,8 @@ class BusComponent extends PositionComponent
     final cell = layout.cellSize;
     final long = bus.length * cell;
     final halfShort = cell / 2;
-    final start = layout.gridOrigin +
+    final start =
+        layout.gridOrigin +
         Vector2(
           (bus.col + (bus.dir.isHorizontal ? bus.length : 1) / 2) * cell,
           (bus.row + (bus.dir.isHorizontal ? 1 : bus.length) / 2) * cell,
@@ -136,20 +150,28 @@ class BusComponent extends PositionComponent
 
     final pts = <Vector2>[start];
     void go(double x, double y) {
-      if (pts.last.distanceTo(Vector2(x, y)) > 0.5) pts.add(Vector2(x, y));
+      if (pts.last.distanceTo(Vector2(x, y)) > _minStep) pts.add(Vector2(x, y));
     }
 
     switch (bus.dir) {
       case Direction.north:
         break;
       case Direction.west:
-        go(max(g.left - long / 2 - 6, halfShort + 4), start.y);
-      case Direction.east:
-        go(min(g.right + long / 2 + 6, w - halfShort - 4), start.y);
-      case Direction.south:
-        go(start.x, g.bottom + long / 2 + 6);
         go(
-          start.x < w / 2 ? halfShort + 4 : w - halfShort - 4,
+          max(g.left - long / 2 - _lotClearance, halfShort + _edgeMargin),
+          start.y,
+        );
+      case Direction.east:
+        go(
+          min(g.right + long / 2 + _lotClearance, w - halfShort - _edgeMargin),
+          start.y,
+        );
+      case Direction.south:
+        go(start.x, g.bottom + long / 2 + _lotClearance);
+        go(
+          start.x < w / 2
+              ? halfShort + _edgeMargin
+              : w - halfShort - _edgeMargin,
           pts.last.y,
         );
     }
@@ -175,6 +197,11 @@ class BusComponent extends PositionComponent
     _applyPose(route.first, route[1]);
   }
 
+  /// The size change runs over this stretch of the drive before the bay
+  /// (as shares of it): it starts at [_morphFrom] and lasts [_morphSpan].
+  static const double _morphFrom = 0.2;
+  static const double _morphSpan = 0.8;
+
   void _stepFlight(double dt) {
     final route = _route!;
     var t = _flightT + dt;
@@ -198,7 +225,7 @@ class BusComponent extends PositionComponent
     final morph = firstPart <= 0
         ? 1.0
         : Curves.easeInOut.transform(
-            ((left / firstPart - 0.2) / 0.8).clamp(0.0, 1.0),
+            ((left / firstPart - _morphFrom) / _morphSpan).clamp(0.0, 1.0),
           );
     for (var i = 1; i < route.length; i++) {
       final seg = route[i].distanceTo(route[i - 1]);
@@ -252,17 +279,39 @@ class BusComponent extends PositionComponent
     size = h.isHorizontal ? Vector2(long, wide) : Vector2(wide, long);
   }
 
+  /// A blocked vehicle jolts this far forward and back.
+  static const double _shakeDistance = 6;
+  static const double _shakeStep = 0.05;
+
   void shake() {
     if (children.whereType<Effect>().isNotEmpty) return;
-    final d = Vector2(bus.dir.dCol.toDouble(), bus.dir.dRow.toDouble()) * 6;
+    final d =
+        Vector2(bus.dir.dCol.toDouble(), bus.dir.dRow.toDouble()) *
+        _shakeDistance;
     add(
       SequenceEffect([
-        MoveEffect.by(d, EffectController(duration: 0.05)),
-        MoveEffect.by(-d * 2, EffectController(duration: 0.1)),
-        MoveEffect.by(d, EffectController(duration: 0.05)),
+        MoveEffect.by(d, EffectController(duration: _shakeStep)),
+        MoveEffect.by(-d * 2, EffectController(duration: _shakeStep * 2)),
+        MoveEffect.by(d, EffectController(duration: _shakeStep)),
       ], onComplete: () => position = _home!.clone()),
     );
   }
+
+  /// Gap between neighbouring jam vehicles, as a share of a cell.
+  static const double _jamInset = 0.06;
+
+  // Hint glow: a pulsing white ring round the roof.
+  static const double _pulseBase = 0.55;
+  static const double _pulseDepth = 0.45;
+  static const double _pulseSpeed = 9;
+  static const double _glowSpread = 3;
+  static const double _glowRadius = 12;
+  static const double _glowWidth = 5;
+  static const int _glowRgb = 255;
+
+  /// The color symbol sits toward the tail so the arrow stays visible.
+  static const double _symbolBack = 0.3;
+  static const double _symbolSize = 0.36;
 
   @override
   void render(Canvas canvas) {
@@ -282,7 +331,7 @@ class BusComponent extends PositionComponent
     }
     final flying = _route != null;
     final dir = flying ? _heading : bus.dir;
-    final r = Rect.fromLTWH(0, 0, size.x, size.y).deflate(cell * 0.06);
+    final r = Rect.fromLTWH(0, 0, size.x, size.y).deflate(cell * _jamInset);
     final roof = paintVehicle(
       canvas,
       r,
@@ -294,23 +343,25 @@ class BusComponent extends PositionComponent
     );
     if (flying) return;
     if (isHinted) {
-      final pulse = 0.55 + 0.45 * sin(_hintLeft * 9);
+      final pulse = _pulseBase + _pulseDepth * sin(_hintLeft * _pulseSpeed);
       canvas.drawRRect(
-        RRect.fromRectAndRadius(roof.inflate(3), const Radius.circular(12)),
+        RRect.fromRectAndRadius(
+          roof.inflate(_glowSpread),
+          const Radius.circular(_glowRadius),
+        ),
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 5
-          ..color = Color.fromRGBO(255, 255, 255, pulse),
+          ..strokeWidth = _glowWidth
+          ..color = Color.fromRGBO(_glowRgb, _glowRgb, _glowRgb, pulse),
       );
     }
     if (game.showSymbols) {
-      // Sit it toward the tail so it does not hide the direction arrow.
       final long = bus.dir.isHorizontal ? roof.width : roof.height;
       final back = Offset(-bus.dir.dCol.toDouble(), -bus.dir.dRow.toDouble());
       paintSymbol(
         canvas,
-        roof.center + back * (long * 0.3),
-        roof.shortestSide * 0.36,
+        roof.center + back * (long * _symbolBack),
+        roof.shortestSide * _symbolSize,
         symbolFor(bus.colorIndex),
       );
     }

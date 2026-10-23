@@ -8,9 +8,12 @@ import '../levels/level_repository.dart';
 import '../services/feedback_service.dart';
 import '../services/progress_service.dart';
 import 'feedback_scope.dart';
+import 'first_time_tips.dart';
+import 'game_overlays.dart';
 import 'game_hud.dart';
 import 'progress_scope.dart';
 import 'result_overlay.dart';
+import 'ui_style.dart';
 import 'widgets.dart';
 
 /// Hosts the Flame game in a centered portrait box (letterboxed on wide
@@ -87,19 +90,7 @@ class _GameScreenState extends State<GameScreen> {
   /// A short note for anything the player has not met before: a timed level
   /// or a service vehicle. Each is shown once, ever.
   String? _firstTimeTips(ProgressService progress, {required bool timed}) {
-    final colors = {for (final b in _game.level.buses) b.colorIndex};
-    final tips = <String, String>{
-      if (timed)
-        'timed':
-            'Timed level! Clear it before the clock runs out. '
-            'Finish with half the time left for bonus coins.',
-      if (colors.contains(policeColor))
-        'police': 'Police officers only board police cars.',
-      if (colors.contains(fireColor))
-        'fire': 'Firefighters only board fire trucks.',
-      if (colors.contains(ambulanceColor))
-        'ambulance': 'Paramedics only board ambulances.',
-    };
+    final tips = firstTimeTipsFor(_game.level, timed: timed);
     final fresh = tips.entries.where((e) => !progress.tipSeen(e.key)).toList();
     if (fresh.isEmpty) return null;
     for (final e in fresh) {
@@ -160,12 +151,9 @@ class _GameScreenState extends State<GameScreen> {
       return;
     }
     final previous = progress.stars(widget.levelNumber);
-    var coins = ProgressService.winCoins(
-      previousStars: previous,
-      stars: stars,
-    );
-    final fast = _game.timeFraction >= 0.5;
-    if (fast && coins > 0) coins += 10;
+    var coins = ProgressService.winCoins(previousStars: previous, stars: stars);
+    final fast = _game.timeFraction >= ProgressService.fastFinishShare;
+    if (fast && coins > 0) coins += ProgressService.fastFinishCoins;
     setState(() {
       _stars = stars;
       _coinsEarned = coins;
@@ -191,21 +179,18 @@ class _GameScreenState extends State<GameScreen> {
     final progress = ProgressScope.read(context);
     if (progress.hintBoosters <= 0) return;
     if (_game.useHint() == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No safe move left. Try Undo.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      _snack('No safe move left. Try Undo.');
       return;
     }
     await progress.useBooster(Booster.hint);
   }
 
+  static const Duration _snackDuration = Duration(seconds: 2);
+
   void _snack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), duration: _snackDuration));
   }
 
   Future<void> _useRefresh() async {
@@ -240,15 +225,9 @@ class _GameScreenState extends State<GameScreen> {
     final progress = ProgressScope.read(context);
     if (!_game.canAddSlot) return;
     if (!await progress.spendCoins(ProgressService.slotUnlockCost)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Not enough coins (${ProgressService.slotUnlockCost} needed).',
-          ),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        _snack('Not enough coins (${ProgressService.slotUnlockCost} needed).');
+      }
       return;
     }
     if (_game.addExtraSlot()) {
@@ -319,16 +298,20 @@ class _GameScreenState extends State<GameScreen> {
                             coins: progress.coins,
                             onPause: () => _setPaused(true),
                           ),
-                          LeftSign(count: s.queue.length),
+                          ValueListenableBuilder<int>(
+                            valueListenable: _game.passengersLeft,
+                            builder: (context, left, _) =>
+                                LeftSign(count: left),
+                          ),
                           if (_game.level.hint != null)
-                            _HintBanner(text: _game.level.hint!),
+                            HintBanner(text: _game.level.hint!),
                           if (_tip != null)
-                            _HintBanner(
+                            HintBanner(
                               key: const Key('tip-banner'),
                               text: _tip!,
                               onTap: () => setState(() => _tip = null),
                             ),
-                          _BoosterBar(
+                          BoosterBar(
                             clearArmed: _game.clearArmed,
                             tilesFor: (armed) => [
                               BoosterTile(
@@ -401,7 +384,7 @@ class _GameScreenState extends State<GameScreen> {
                                       key: const Key('result-unlock'),
                                       label:
                                           'Unlock slot (${ProgressService.slotUnlockCost})',
-                                      color: const Color(0xFF2E9E4F),
+                                      color: AppColors.go,
                                       onPressed: _unlockSlot,
                                     )
                                   : null,
@@ -435,90 +418,4 @@ class _GameScreenState extends State<GameScreen> {
     enabled: _game.canUndo,
     onPressed: _useUndo,
   );
-}
-
-class _BoosterBar extends StatelessWidget {
-  const _BoosterBar({required this.clearArmed, required this.tilesFor});
-
-  final ValueNotifier<bool> clearArmed;
-  final List<Widget> Function(bool clearArmed) tilesFor;
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: clearArmed,
-      builder: (context, armed, _) => Stack(
-        children: [
-          if (armed)
-            Positioned(
-              key: const Key('clear-banner'),
-              top: GameLayout.boosterTop - 40,
-              left: 20,
-              right: 20,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF39C12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Text(
-                  'Tap any vehicle to airlift it  (tap Clear to cancel)',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          Positioned(
-            left: 8,
-            right: 8,
-            top: GameLayout.boosterTop,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: tilesFor(armed),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Teaching text for tutorial levels, between the HUD and the board.
-class _HintBanner extends StatelessWidget {
-  const _HintBanner({super.key, required this.text, this.onTap});
-
-  final String text;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      top: 96,
-      left: 20,
-      right: 20,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          decoration: BoxDecoration(
-            color: const Color(0xFF3F566D),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Text(
-            text,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              height: 1.15,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

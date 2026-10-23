@@ -7,6 +7,7 @@ import 'package:flutter/animation.dart';
 import 'bus_escape_game.dart';
 import 'symbols.dart';
 import 'vehicle_painter.dart';
+import 'layers.dart';
 
 /// One passenger walking from the queue to a seat in a parked vehicle.
 class BoardingPassenger extends PositionComponent
@@ -17,9 +18,15 @@ class BoardingPassenger extends PositionComponent
     required this.toScale,
     required this.colorIndex,
     required this.onArrived,
-  }) : super(priority: 6);
+  }) : super(priority: Layer.boarding);
 
   static const double duration = 0.34;
+
+  /// Peak height of the little hop on the way.
+  static const double _hop = 10;
+
+  /// The color symbol rides along until the passenger is nearly seated.
+  static const double _symbolUntil = 0.8;
 
   final Offset from;
   final Offset to;
@@ -43,11 +50,11 @@ class BoardingPassenger extends PositionComponent
   void render(Canvas canvas) {
     final u = (_t / duration).clamp(0.0, 1.0);
     final p = Curves.easeInOutSine.transform(u);
-    final pos = Offset.lerp(from, to, p)!.translate(0, -sin(pi * p) * 10);
+    final pos = Offset.lerp(from, to, p)!.translate(0, -sin(pi * p) * _hop);
     final scale = 1 + (toScale - 1) * p;
     paintPassenger(canvas, pos, colorIndex, scale: scale);
-    if (game.showSymbols && u < 0.8) {
-      paintSymbol(canvas, pos.translate(0, 4), 8, symbolFor(colorIndex));
+    if (game.showSymbols && u < _symbolUntil) {
+      paintPersonSymbol(canvas, pos, colorIndex);
     }
   }
 }

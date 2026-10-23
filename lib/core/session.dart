@@ -39,10 +39,15 @@ class GameSession {
   int get stars {
     if (_state.status != GameStatus.won) return 0;
     if (_undos > 0 || _extraSlots > 0 || _hintsUsed > 0 || _helpUsed > 0) {
-      return 1;
+      return helpedStars;
     }
-    return _blockedTaps == 0 ? 3 : 2;
+    return _blockedTaps == 0 ? maxStars : cleanStars;
   }
+
+  /// Star ratings, see [stars].
+  static const int maxStars = 3;
+  static const int cleanStars = 2;
+  static const int helpedStars = 1;
 
   /// Returns true if the bus left the grid.
   bool tap(int busId) {

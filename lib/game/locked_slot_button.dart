@@ -2,11 +2,12 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 
 import 'bus_escape_game.dart';
+import 'layers.dart';
 
 /// Invisible tap target over a locked lane slot.
 class LockedSlotButton extends PositionComponent
     with TapCallbacks, HasGameReference<BusEscapeGame> {
-  LockedSlotButton(this.slot) : super(priority: 6);
+  LockedSlotButton(this.slot) : super(priority: Layer.slotButton);
 
   final int slot;
 

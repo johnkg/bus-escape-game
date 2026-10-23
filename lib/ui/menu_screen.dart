@@ -5,24 +5,30 @@ import 'game_screen.dart';
 import 'level_select_screen.dart';
 import 'progress_scope.dart';
 import 'settings_screen.dart';
+import 'ui_style.dart';
 import 'widgets.dart';
 
 class MenuScreen extends StatelessWidget {
   const MenuScreen({super.key});
 
+  static const double _logoSize = 96;
+  static const double _trophySize = 18;
+
   @override
   Widget build(BuildContext context) {
     final progress = ProgressScope.of(context);
+    final today = DateTime.now();
+    final streak = progress.dailyStreak(today);
     return ScreenFrame(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(
             Icons.directions_bus_filled,
-            size: 96,
-            color: Color(0xFFF39C12),
+            size: _logoSize,
+            color: AppColors.accent,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: Gap.l),
           // Long-press the title to practise any level (progress is kept).
           GestureDetector(
             key: const Key('menu-title'),
@@ -31,73 +37,62 @@ class MenuScreen extends StatelessWidget {
               'Bus Escape',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 40,
+                fontSize: FontSizes.hero,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: Gap.huge),
           BigButton(
             label: 'Play  •  Level ${progress.unlockedLevel}',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => GameScreen(levelNumber: progress.unlockedLevel),
-              ),
+            onPressed: () => pushScreen(
+              context,
+              GameScreen(levelNumber: progress.unlockedLevel),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: Gap.xl),
           BigButton(
             key: const Key('daily-button'),
-            label: progress.dailyDone(DateTime.now())
+            label: progress.dailyDone(today)
                 ? 'Daily Challenge  ✓'
                 : 'Daily Challenge',
-            color: const Color(0xFF2E9E4F),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => GameScreen(daily: DateTime.now()),
-              ),
-            ),
+            color: AppColors.go,
+            onPressed: () =>
+                pushScreen(context, GameScreen(daily: DateTime.now())),
           ),
-          if (progress.dailyStreak(DateTime.now()) > 0)
+          if (streak > 0)
             Padding(
-              padding: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.only(top: Gap.s),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (progress.dailyStreak(DateTime.now()) >=
-                      ProgressService.streakRewardEvery)
+                  if (streak >= ProgressService.streakRewardEvery)
                     const Padding(
-                      padding: EdgeInsets.only(right: 4),
+                      padding: EdgeInsets.only(right: Gap.xs),
                       child: Icon(
                         Icons.emoji_events,
-                        color: Color(0xFFF5C21B),
-                        size: 18,
+                        color: AppColors.gold,
+                        size: _trophySize,
                       ),
                     ),
                   Text(
-                    '${progress.dailyStreak(DateTime.now())}-day streak',
-                    style: const TextStyle(color: Color(0xFFF5C21B)),
+                    '$streak-day streak',
+                    style: const TextStyle(color: AppColors.gold),
                   ),
                 ],
               ),
             ),
-          const SizedBox(height: 16),
+          const SizedBox(height: Gap.xl),
           BigButton(
             label: 'Levels',
-            color: const Color(0xFF3498DB),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const LevelSelectScreen(),
-              ),
-            ),
+            color: AppColors.secondary,
+            onPressed: () => pushScreen(context, const LevelSelectScreen()),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: Gap.xl),
           BigButton(
             label: 'Settings',
-            color: const Color(0xFF7F8C8D),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-            ),
+            color: AppColors.muted,
+            onPressed: () => pushScreen(context, const SettingsScreen()),
           ),
         ],
       ),
@@ -111,11 +106,7 @@ Future<void> _jumpToLevel(BuildContext context) async {
     builder: (_) => const _JumpDialog(),
   );
   if (level == null || !context.mounted) return;
-  await Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => GameScreen(levelNumber: level, practice: true),
-    ),
-  );
+  await pushScreen(context, GameScreen(levelNumber: level, practice: true));
 }
 
 /// Asks for a level number. Practice runs never touch saved progress.
@@ -129,6 +120,9 @@ class _JumpDialog extends StatefulWidget {
 class _JumpDialogState extends State<_JumpDialog> {
   final _controller = TextEditingController();
 
+  /// Highest level the practice box accepts.
+  static const int _maxLevel = 9999;
+
   @override
   void dispose() {
     _controller.dispose();
@@ -137,7 +131,9 @@ class _JumpDialogState extends State<_JumpDialog> {
 
   void _start() {
     final n = int.tryParse(_controller.text.trim());
-    if (n != null && n >= 1 && n <= 9999) Navigator.of(context).pop(n);
+    if (n != null && n >= ProgressService.firstLevel && n <= _maxLevel) {
+      Navigator.of(context).pop(n);
+    }
   }
 
   @override
@@ -150,7 +146,7 @@ class _JumpDialogState extends State<_JumpDialog> {
         autofocus: true,
         keyboardType: TextInputType.number,
         decoration: const InputDecoration(
-          hintText: 'Level number (1-9999)',
+          hintText: 'Level number (${ProgressService.firstLevel}-$_maxLevel)',
           helperText: 'Progress, stars and coins are not saved.',
         ),
         onSubmitted: (_) => _start(),

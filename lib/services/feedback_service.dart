@@ -106,6 +106,10 @@ class NoopHapticsPlayer implements HapticsPlayer {
 /// Real audio via flame_audio. Failures (blocked autoplay, missing
 /// platform support) are swallowed: sound must never break the game.
 class FlameSoundPlayer implements SoundPlayer {
+  /// Effects play near full volume; music sits quietly underneath.
+  static const double _sfxVolume = 0.8;
+  static const double _musicVolume = 0.35;
+
   static const String musicFile = 'music.wav';
 
   Future<void> preload() async {
@@ -131,7 +135,7 @@ class FlameSoundPlayer implements SoundPlayer {
   @override
   Future<void> playSfx(String file) async {
     try {
-      await FlameAudio.play(file, volume: 0.8);
+      await FlameAudio.play(file, volume: _sfxVolume);
     } catch (e) {
       debugPrint('SFX failed ($file): $e');
     }
@@ -140,7 +144,7 @@ class FlameSoundPlayer implements SoundPlayer {
   @override
   Future<void> startMusic() async {
     try {
-      await FlameAudio.bgm.play(musicFile, volume: 0.35);
+      await FlameAudio.bgm.play(musicFile, volume: _musicVolume);
     } catch (e) {
       debugPrint('Music failed: $e');
     }

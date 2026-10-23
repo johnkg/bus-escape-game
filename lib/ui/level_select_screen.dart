@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../levels/level_repository.dart';
+import '../services/progress_service.dart';
 import 'game_screen.dart';
 import 'progress_scope.dart';
+import 'ui_style.dart';
 import 'widgets.dart';
 
 class LevelSelectScreen extends StatelessWidget {
@@ -11,6 +13,10 @@ class LevelSelectScreen extends StatelessWidget {
   /// How many locked levels to show past the player's current one.
   static const int lookahead = 15;
 
+  static const int _columns = 4;
+  static const double _starSize = 13;
+  static const double _timerSize = 14;
+
   @override
   Widget build(BuildContext context) {
     final progress = ProgressScope.of(context);
@@ -18,32 +24,26 @@ class LevelSelectScreen extends StatelessWidget {
     return ScreenFrame(
       title: 'Levels',
       child: GridView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(Gap.xl),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 4,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
+          crossAxisCount: _columns,
+          mainAxisSpacing: Gap.l,
+          crossAxisSpacing: Gap.l,
         ),
         itemCount: unlocked + lookahead,
         itemBuilder: (context, i) {
-          final level = i + 1;
+          final level = ProgressService.firstLevel + i;
           final open = level <= unlocked;
           final stars = progress.stars(level);
           return Material(
             color: open
-                ? (level == unlocked
-                      ? const Color(0xFFF39C12)
-                      : const Color(0xFF3498DB))
-                : const Color(0xFF3F566D),
-            borderRadius: BorderRadius.circular(14),
+                ? (level == unlocked ? AppColors.accent : AppColors.secondary)
+                : AppColors.panel,
+            borderRadius: BorderRadius.circular(Radii.l),
             child: InkWell(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(Radii.l),
               onTap: open
-                  ? () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => GameScreen(levelNumber: level),
-                      ),
-                    )
+                  ? () => pushScreen(context, GameScreen(levelNumber: level))
                   : null,
               child: Center(
                 child: open
@@ -54,15 +54,15 @@ class LevelSelectScreen extends StatelessWidget {
                             '$level',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 22,
+                              fontSize: FontSizes.title,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          if (stars > 0) StarRow(stars: stars, size: 13),
+                          if (stars > 0) StarRow(stars: stars, size: _starSize),
                           if (LevelRepository.isTimed(level))
                             const Icon(
                               Icons.timer,
-                              size: 14,
+                              size: _timerSize,
                               color: Colors.white70,
                             ),
                         ],
