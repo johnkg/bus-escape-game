@@ -23,9 +23,10 @@ void main() {
   ) async {
     final progress = await loadProgress(tester, {'unlocked': 3});
     await tester.pumpWidget(BusEscapeApp(progress: progress));
-    expect(find.text('Play  •  Level 3'), findsOneWidget);
+    expect(find.text('Play'), findsOneWidget);
+    expect(find.text('Level 3'), findsOneWidget);
 
-    await tester.tap(find.text('Play  •  Level 3'));
+    await tester.tap(find.text('Play'));
     // Flame ticks forever, so pumpAndSettle would never return here.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
@@ -180,7 +181,7 @@ void main() {
     expect(find.text('1'), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
     expect(find.text('3'), findsNothing);
-    expect(find.byIcon(Icons.lock), findsWidgets);
+    expect(find.byIcon(Icons.lock_rounded), findsWidgets);
   });
 
   testWidgets('level select shows earned stars', (tester) async {
@@ -192,8 +193,11 @@ void main() {
     await tester.pumpWidget(BusEscapeApp(progress: progress));
     await tester.tap(find.text('Levels'));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.star), findsNWidgets(4)); // 3 + 1 earned
-    expect(find.byIcon(Icons.star_border), findsNWidgets(2)); // 0 + 2 missing
+    expect(find.byIcon(Icons.star_rounded), findsNWidgets(4)); // 3 + 1 earned
+    expect(
+      find.byIcon(Icons.star_outline_rounded),
+      findsNWidgets(2),
+    ); // 0 + 2 missing
   });
 
   testWidgets('settings toggles persist and reset clears progress', (
@@ -544,7 +548,7 @@ void animationTests() {
       expect(progress.stars(1), 3);
       expect(progress.coins, ProgressService.startingCoins + 50);
       expect(find.text('+50 coins'), findsOneWidget);
-      expect(find.byIcon(Icons.star), findsNWidgets(3));
+      expect(find.byIcon(Icons.star_rounded), findsNWidgets(3));
     });
 
     testWidgets('lose: the screen shakes', (tester) async {
