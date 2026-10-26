@@ -14,7 +14,7 @@ class LevelSelectScreen extends StatelessWidget {
   static const int lookahead = 15;
 
   static const int _columns = 4;
-  static const double _starSize = 13;
+  static const double _starSize = 14;
   static const double _timerSize = 14;
 
   @override
@@ -35,40 +35,33 @@ class LevelSelectScreen extends StatelessWidget {
           final level = ProgressService.firstLevel + i;
           final open = level <= unlocked;
           final stars = progress.stars(level);
-          return Material(
+          return ClayButton(
             color: open
                 ? (level == unlocked ? AppColors.accent : AppColors.secondary)
                 : AppColors.panel,
-            borderRadius: BorderRadius.circular(Radii.l),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(Radii.l),
-              onTap: open
-                  ? () => pushScreen(context, GameScreen(levelNumber: level))
-                  : null,
-              child: Center(
-                child: open
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$level',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: FontSizes.title,
-                              fontWeight: FontWeight.bold,
-                            ),
+            radius: Radii.xl,
+            lip: Clay.smallLip,
+            semanticLabel: open ? null : 'Level $level, locked',
+            onPressed: open
+                ? () => pushScreen(context, GameScreen(levelNumber: level))
+                : null,
+            child: Center(
+              child: open
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ClayLabel('$level', fontSize: FontSizes.heading),
+                        if (stars > 0) StarRow(stars: stars, size: _starSize),
+                        if (LevelRepository.isTimed(level))
+                          const Icon(
+                            Icons.timer_rounded,
+                            size: _timerSize,
+                            color: Colors.white,
+                            semanticLabel: 'timed',
                           ),
-                          if (stars > 0) StarRow(stars: stars, size: _starSize),
-                          if (LevelRepository.isTimed(level))
-                            const Icon(
-                              Icons.timer,
-                              size: _timerSize,
-                              color: Colors.white70,
-                            ),
-                        ],
-                      )
-                    : const Icon(Icons.lock, color: Colors.white38),
-              ),
+                      ],
+                    )
+                  : const Icon(Icons.lock_rounded, color: Colors.white),
             ),
           );
         },

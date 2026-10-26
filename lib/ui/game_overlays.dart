@@ -35,6 +35,7 @@ class BoosterBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.accent,
                   borderRadius: BorderRadius.circular(Radii.l),
+                  border: Border.all(color: AppColors.frame, width: Clay.rim),
                 ),
                 child: const Text(
                   'Tap any vehicle to airlift it  (tap Clear to cancel)',
@@ -42,7 +43,8 @@ class BoosterBar extends StatelessWidget {
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: FontSizes.small,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
+                    shadows: labelShadows,
                   ),
                 ),
               ),
@@ -90,6 +92,7 @@ class HintBanner extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.panel,
             borderRadius: BorderRadius.circular(Radii.l),
+            border: Border.all(color: AppColors.cardRim, width: Clay.rim / 2),
           ),
           child: Text(
             text,
@@ -97,6 +100,7 @@ class HintBanner extends StatelessWidget {
             style: const TextStyle(
               color: Colors.white,
               fontSize: FontSizes.small,
+              fontWeight: FontWeight.w700,
               height: _lineHeight,
             ),
           ),

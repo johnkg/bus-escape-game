@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'services/feedback_service.dart';
 import 'services/progress_service.dart';
+import 'ui/app_theme.dart';
 import 'ui/feedback_scope.dart';
 import 'ui/menu_screen.dart';
 import 'ui/monetization_scope.dart';
@@ -45,10 +46,7 @@ class BusEscapeApp extends StatelessWidget {
           child: MaterialApp(
             title: 'Bus Escape',
             debugShowCheckedModeBanner: false,
-            theme: ThemeData(
-              colorSchemeSeed: Colors.orange,
-              useMaterial3: true,
-            ),
+            theme: buildAppTheme(),
             home: const MenuScreen(),
           ),
         ),

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
+import '../game/palette.dart' show shade;
 import 'ui_style.dart';
 import 'widgets.dart';
 
@@ -30,8 +31,7 @@ class HudTop extends StatelessWidget {
   static const double _coinPadV = 5;
   static const double _coinPadRight = 14;
   static const double _coinIconSize = 22;
-  static const double _pauseSize = 42;
-  static const double _pauseIconSize = 28;
+  static const double _chipRim = 1.5;
 
   @override
   Widget build(BuildContext context) {
@@ -51,8 +51,9 @@ class HudTop extends StatelessWidget {
               _coinPadV,
             ),
             decoration: BoxDecoration(
-              color: Colors.black54,
+              color: AppColors.ink,
               borderRadius: BorderRadius.circular(Radii.pill),
+              border: Border.all(color: AppColors.cardRim, width: _chipRim),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -67,8 +68,9 @@ class HudTop extends StatelessWidget {
                   '$coins',
                   style: const TextStyle(
                     color: Colors.white,
+                    fontFamily: Fonts.display,
                     fontSize: FontSizes.label,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -86,7 +88,7 @@ class HudTop extends StatelessWidget {
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: FontSizes.caption,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w800,
                     shadows: textOverGame,
                   ),
                 ),
@@ -100,26 +102,12 @@ class HudTop extends StatelessWidget {
               ],
             ),
           ),
-          Material(
-            color: AppColors.go,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(Radii.m),
-              side: buttonRim,
-            ),
-            child: InkWell(
-              key: const Key('pause-button'),
-              borderRadius: BorderRadius.circular(Radii.m),
-              onTap: onPause,
-              child: const SizedBox(
-                width: _pauseSize,
-                height: _pauseSize,
-                child: Icon(
-                  Icons.pause,
-                  color: Colors.white,
-                  size: _pauseIconSize,
-                ),
-              ),
-            ),
+          ClayIconButton(
+            key: const Key('pause-button'),
+            icon: Icons.pause_rounded,
+            semanticLabel: 'Pause',
+            rimColor: AppColors.frame,
+            onPressed: onPause,
           ),
         ],
       ),
@@ -151,8 +139,14 @@ class LeftSign extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: Gap.xs),
         decoration: BoxDecoration(
           color: AppColors.queueSign,
-          borderRadius: BorderRadius.circular(Radii.s),
+          borderRadius: BorderRadius.circular(Radii.m),
           border: Border.all(color: Colors.white, width: _border),
+          boxShadow: [
+            BoxShadow(
+              color: shade(AppColors.queueSign, Clay.lipShade),
+              offset: const Offset(0, Clay.smallLip),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -161,8 +155,10 @@ class LeftSign extends StatelessWidget {
               '$count',
               style: const TextStyle(
                 color: Colors.white,
+                fontFamily: Fonts.display,
                 fontSize: FontSizes.title,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w700,
+                shadows: labelShadows,
               ),
             ),
             const Text(
@@ -198,24 +194,27 @@ class PauseOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return DialogCard(
       children: [
-        const Text(
-          'Paused',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: FontSizes.heading,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        const DialogTitle('Paused'),
         const SizedBox(height: Gap.xxl),
-        BigButton(label: 'Resume', onPressed: onResume),
+        BigButton(
+          label: 'Resume',
+          icon: Icons.play_arrow_rounded,
+          onPressed: onResume,
+        ),
         const SizedBox(height: Gap.l),
         BigButton(
           label: 'Restart',
+          icon: Icons.replay_rounded,
           color: AppColors.secondary,
           onPressed: onRestart,
         ),
         const SizedBox(height: Gap.l),
-        BigButton(label: 'Menu', color: AppColors.muted, onPressed: onMenu),
+        BigButton(
+          label: 'Menu',
+          icon: Icons.home_rounded,
+          color: AppColors.muted,
+          onPressed: onMenu,
+        ),
       ],
     );
   }
@@ -246,20 +245,22 @@ class _TimeChip extends StatelessWidget {
       margin: const EdgeInsets.only(top: Gap.xxs),
       padding: const EdgeInsets.symmetric(horizontal: _padH, vertical: Gap.xxs),
       decoration: BoxDecoration(
-        color: low ? AppColors.warning : Colors.black54,
+        color: low ? AppColors.warning : AppColors.ink,
         borderRadius: BorderRadius.circular(Radii.m),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.timer, color: Colors.white, size: _iconSize),
+          const Icon(Icons.timer_rounded, color: Colors.white, size: _iconSize),
           const SizedBox(width: Gap.xs),
           Text(
             text,
             style: const TextStyle(
               color: Colors.white,
+              fontFamily: Fonts.display,
               fontSize: FontSizes.body,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
+              fontFeatures: [FontFeature.tabularFigures()],
             ),
           ),
         ],

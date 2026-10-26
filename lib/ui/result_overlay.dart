@@ -56,15 +56,10 @@ class ResultOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return DialogCard(
       children: [
-        Text(
+        DialogTitle(
           won
               ? (daily ? 'Daily clear!' : 'Level clear!')
               : (timedOut ? "Time's up!" : 'Lane full!'),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: FontSizes.heading,
-            fontWeight: FontWeight.bold,
-          ),
         ),
         const SizedBox(height: Gap.l),
         if (won) ...[
@@ -78,17 +73,26 @@ class ResultOverlay extends StatelessWidget {
               _ => 'No boosters or hints for more stars.',
             },
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70),
+            style: const TextStyle(color: AppColors.textMuted),
           ),
           if (coins > 0)
             Padding(
               padding: const EdgeInsets.only(top: Gap.m),
-              child: Text(
-                '+$coins coins',
-                style: const TextStyle(
-                  color: AppColors.gold,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.monetization_on, color: AppColors.gold),
+                  const SizedBox(width: Gap.xs),
+                  Text(
+                    '+$coins coins',
+                    style: const TextStyle(
+                      color: AppColors.gold,
+                      fontFamily: Fonts.display,
+                      fontSize: FontSizes.button,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ),
           if (fast)
@@ -103,7 +107,8 @@ class ResultOverlay extends StatelessWidget {
             timedOut
                 ? 'The clock ran out. Be quicker next time!'
                 : 'No bus could take the next passenger.',
-            style: const TextStyle(color: Colors.white70),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.textMuted),
           ),
         const SizedBox(height: Gap.xxxl),
         if (!won && extraSlotButton != null) ...[
@@ -115,21 +120,31 @@ class ResultOverlay extends StatelessWidget {
           const SizedBox(height: Gap.l),
         ],
         if (won && !daily) ...[
-          BigButton(label: 'Next level', onPressed: onNext),
+          BigButton(
+            label: 'Next level',
+            icon: Icons.arrow_forward_rounded,
+            onPressed: onNext,
+          ),
           const SizedBox(height: Gap.l),
         ],
         BigButton(
           label: won ? 'Replay' : 'Retry',
+          icon: Icons.replay_rounded,
           color: won ? AppColors.secondary : AppColors.accent,
           onPressed: onRetry,
         ),
         const SizedBox(height: Gap.l),
-        BigButton(label: 'Menu', color: AppColors.muted, onPressed: onMenu),
+        BigButton(
+          label: 'Menu',
+          icon: Icons.home_rounded,
+          color: AppColors.muted,
+          onPressed: onMenu,
+        ),
       ],
     );
   }
 
-  static const double _starSize = 40;
+  static const double _starSize = 48;
 }
 
 /// One gold line of extra rewards under the coins.
@@ -141,6 +156,13 @@ class _Bonus extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(top: Gap.xs),
-    child: Text(text, style: const TextStyle(color: AppColors.gold)),
+    child: Text(
+      text,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        color: AppColors.gold,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
   );
 }
