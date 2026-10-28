@@ -103,13 +103,13 @@ abstract final class Clay {
   static const double rim = 3;
 
   /// Lip color: the face darkened by this much HSL lightness.
-  static const double lipShade = -0.14;
+  static const double lipShade = palette.clayLipShade;
 
   /// Top of the face gradient: the face lightened by this much.
   static const double highlightShade = 0.07;
 
   /// Rim color: the face lightened by this much.
-  static const double rimShade = 0.16;
+  static const double rimShade = palette.clayRimShade;
 
   /// Blur and offset of the soft drop shadow.
   static const double shadowBlur = 10;
