@@ -21,63 +21,170 @@ class SceneView extends PositionComponent with HasGameReference<BusEscapeGame> {
     _paintLot(canvas);
   }
 
-  // The depot building at the top of the screen, in design pixels.
-  static const Rect _building = Rect.fromLTWH(14, 4, 362, 126);
-  static const double _roofHeight = 26;
-  static const double _buildingRadius = 12;
-  static const Offset _buildingShadow = Offset(0, 4);
-  static const int _windowCount = 5;
-  static const Rect _firstWindow = Rect.fromLTWH(30, 50, 40, 30);
-  static const double _windowPitch = 52;
-  static const double _windowRadius = 4;
-  static const Rect _sign = Rect.fromLTWH(292, 36, 66, 48);
-  static const double _signRadius = 6;
-  static const Rect _door = Rect.fromLTWH(288, 88, 32, 42);
-  static const double _doorRadius = 4;
-  static const Rect _awning = Rect.fromLTWH(282, 84, 44, 8);
+  // The depot building at the top of the screen, in design pixels. A
+  // broad clay roof carries the HUD; the wall below shows windows, the
+  // door the queue walks out of, its awning and a bus-stop sign.
+  static const Rect _roof = Rect.fromLTWH(10, 2, 370, 64);
+  static const double _roofRadius = 18;
+  static const double _roofShine = 10;
+  static const Rect _wall = Rect.fromLTWH(20, 56, 350, 78);
+  static const double _wallRadius = 12;
+  static const double _lip = 4;
+  static const double _rim = 2;
+  static const Offset _buildingShadow = Offset(0, 6);
+  static const int _windowCount = 4;
+  static const Rect _firstWindow = Rect.fromLTWH(34, 80, 44, 30);
+  static const double _windowPitch = 58;
+  static const double _windowRadius = 8;
+  static const double _windowShine = 0.4;
+  static const Rect _door = Rect.fromLTWH(288, 92, 32, 42);
+  static const double _doorRadius = 8;
+  static const Rect _awning = Rect.fromLTWH(280, 80, 48, 13);
+  static const double _awningRadius = 6;
+  static const Offset _signCenter = Offset(351, 100);
+  static const double _signRadius = 15;
+
+  // The bus pictogram on the sign, relative to its centre.
+  static const Rect _iconBody = Rect.fromLTWH(-7, -7, 14, 12);
+  static const double _iconRadius = 3;
+  static const Rect _iconGlass = Rect.fromLTWH(-5, -5, 10, 4);
+  static const double _iconWheel = 2;
+  static const double _iconWheelX = 4;
+  static const double _iconWheelY = 6;
+
+  /// A raised clay shape: darker lip under the face, lighter rim on top.
+  static void _clay(Canvas canvas, RRect shape, Color color) {
+    canvas.drawRRect(
+      shape.shift(const Offset(0, _lip)),
+      Paint()..color = shade(color, clayLipShade),
+    );
+    canvas.drawRRect(shape, Paint()..color = color);
+    canvas.drawRRect(
+      shape.deflate(_rim / 2),
+      Paint()
+        ..color = shade(color, clayRimShade)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _rim,
+    );
+  }
 
   void _paintBuilding(Canvas canvas) {
-    final r = RRect.fromRectAndRadius(
-      _building,
-      const Radius.circular(_buildingRadius),
+    final wall = RRect.fromRectAndRadius(
+      _wall,
+      const Radius.circular(_wallRadius),
     );
-    canvas.drawRRect(r.shift(_buildingShadow), Paint()..color = softShadow);
-    canvas.drawRRect(r, Paint()..color = buildingWallColor);
-    // Roof band.
+    final roof = RRect.fromRectAndRadius(
+      _roof,
+      const Radius.circular(_roofRadius),
+    );
+    canvas.drawRRect(wall.shift(_buildingShadow), Paint()..color = softShadow);
+    canvas.drawRRect(wall, Paint()..color = buildingWallColor);
     canvas.drawRRect(
-      RRect.fromRectAndCorners(
-        Rect.fromLTWH(
-          _building.left,
-          _building.top,
-          _building.width,
-          _roofHeight,
-        ),
-        topLeft: const Radius.circular(_buildingRadius),
-        topRight: const Radius.circular(_buildingRadius),
-      ),
-      Paint()..color = buildingRoofColor,
+      wall.deflate(_rim / 2),
+      Paint()
+        ..color = buildingWallRimColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _rim,
     );
-    // Windows.
-    final glass = Paint()..color = buildingWindowColor;
-    for (var i = 0; i < _windowCount; i++) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          _firstWindow.translate(i * _windowPitch, 0),
-          const Radius.circular(_windowRadius),
+    _clay(canvas, roof, buildingRoofColor);
+    // Gloss along the top of the roof.
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          _roof.left + _roofRadius,
+          _roof.top + _rim * 2,
+          _roof.width - _roofRadius * 2,
+          _roofShine,
         ),
+        const Radius.circular(_roofShine / 2),
+      ),
+      Paint()..color = shade(buildingRoofColor, clayRimShade),
+    );
+    // Windows, each with a pale shine across the top.
+    for (var i = 0; i < _windowCount; i++) {
+      final pane = _firstWindow.translate(i * _windowPitch, 0);
+      final glass = RRect.fromRectAndRadius(
+        pane,
+        const Radius.circular(_windowRadius),
+      );
+      canvas.drawRRect(glass, Paint()..color = buildingWindowColor);
+      canvas.drawRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromLTWH(
+            pane.left,
+            pane.top,
+            pane.width,
+            pane.height * _windowShine,
+          ),
+          topLeft: const Radius.circular(_windowRadius),
+          topRight: const Radius.circular(_windowRadius),
+        ),
+        Paint()..color = shade(buildingWindowColor, clayRimShade),
+      );
+      canvas.drawRRect(
         glass,
+        Paint()
+          ..color = buildingWallRimColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = _rim,
       );
     }
-    // Sign and door the queue walks out of.
+    // Door the queue walks out of, under a clay awning.
     canvas.drawRRect(
-      RRect.fromRectAndRadius(_sign, const Radius.circular(_signRadius)),
-      Paint()..color = buildingSignColor,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(_door, const Radius.circular(_doorRadius)),
+      RRect.fromRectAndCorners(
+        _door,
+        topLeft: const Radius.circular(_doorRadius),
+        topRight: const Radius.circular(_doorRadius),
+      ),
       Paint()..color = buildingDoorColor,
     );
-    canvas.drawRect(_awning, Paint()..color = buildingAwningColor);
+    canvas.drawLine(
+      Offset(_door.center.dx, _door.top),
+      Offset(_door.center.dx, _door.bottom),
+      Paint()
+        ..color = shade(buildingDoorColor, clayLipShade)
+        ..strokeWidth = _rim,
+    );
+    _clay(
+      canvas,
+      RRect.fromRectAndRadius(_awning, const Radius.circular(_awningRadius)),
+      buildingAwningColor,
+    );
+    _paintBusStopSign(canvas);
+  }
+
+  /// A round blue sign with a white bus on it.
+  void _paintBusStopSign(Canvas canvas) {
+    canvas.drawCircle(
+      _signCenter.translate(0, _lip),
+      _signRadius,
+      Paint()..color = shade(busStopSignColor, clayLipShade),
+    );
+    canvas.drawCircle(_signCenter, _signRadius, Paint()..color = white);
+    canvas.drawCircle(
+      _signCenter,
+      _signRadius - _rim,
+      Paint()..color = busStopSignColor,
+    );
+    final icon = Paint()..color = white;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        _iconBody.shift(_signCenter),
+        const Radius.circular(_iconRadius),
+      ),
+      icon,
+    );
+    canvas.drawRect(
+      _iconGlass.shift(_signCenter),
+      Paint()..color = busStopIconGlass,
+    );
+    for (final dx in [-_iconWheelX, _iconWheelX]) {
+      canvas.drawCircle(
+        _signCenter.translate(dx, _iconWheelY),
+        _iconWheel,
+        icon,
+      );
+    }
   }
 
   // Lot tiles: a soft rim under the whole lot, then each tile slightly

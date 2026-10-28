@@ -123,7 +123,7 @@ class LeftSign extends StatelessWidget {
 
   /// Where the sign stands, beside the front of the queue.
   static const double _left = 14;
-  static const double _top = 150;
+  static const double _top = 158;
   static const double _width = 84;
   static const double _border = 2;
   static const double _labelSpacing = 1;

@@ -35,6 +35,11 @@ Color shade(Color c, double delta) {
   return hsl.withLightness((hsl.lightness + delta).clamp(0.0, 1.0)).toColor();
 }
 
+/// Clay shapes: the lip under a face is darker by this much HSL lightness,
+/// and the rim around it lighter by this much. Shared with the Flutter UI.
+const double clayLipShade = -0.14;
+const double clayRimShade = 0.16;
+
 /// Menu / screen background.
 const Color backgroundColor = Color(0xFF2C3E50);
 
@@ -50,9 +55,11 @@ const Color bayLineColor = Color(0xFFE9EEF2);
 const Color buildingWallColor = Color(0xFFF3F6F9);
 const Color buildingRoofColor = Color(0xFF5D6D80);
 const Color buildingWindowColor = Color(0xFF8DB4D8);
-const Color buildingSignColor = Color(0xFFD9444A);
+const Color buildingWallRimColor = Color(0xFFD5DEE7);
+const Color buildingAwningColor = Color(0xFFD9444A);
 const Color buildingDoorColor = Color(0xFF55698C);
-const Color buildingAwningColor = Color(0xFF3F4E6E);
+const Color busStopSignColor = Color(0xFF2F7DE1);
+const Color busStopIconGlass = Color(0xFF2B4A6F);
 
 // Neutrals and shadows.
 const Color white = Color(0xFFFFFFFF);
