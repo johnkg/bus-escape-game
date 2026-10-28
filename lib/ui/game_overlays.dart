@@ -73,6 +73,10 @@ class HintBanner extends StatelessWidget {
 
   /// Just below the HUD.
   static const double _top = 96;
+
+  /// Stops short of the depot door, its awning and the bus-stop sign so
+  /// passengers are still seen walking out.
+  static const double _right = 112;
   static const double _padV = 5;
   static const double _lineHeight = 1.15;
 
@@ -81,7 +85,7 @@ class HintBanner extends StatelessWidget {
     return Positioned(
       top: _top,
       left: Gap.xxl,
-      right: Gap.xxl,
+      right: _right,
       child: GestureDetector(
         onTap: onTap,
         child: Container(
