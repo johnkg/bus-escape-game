@@ -42,7 +42,8 @@ class FeedbackService {
 
   bool _musicPlaying = false;
 
-  static const Map<GameEvent, String> _sfx = {
+  /// The sound file for each event.
+  static const Map<GameEvent, String> sfxFiles = {
     GameEvent.busExit: 'exit.wav',
     GameEvent.blocked: 'blocked.wav',
     GameEvent.board: 'board.wav',
@@ -65,7 +66,7 @@ class FeedbackService {
   };
 
   void emit(GameEvent event) {
-    if (settings.soundOn) sound.playSfx(_sfx[event]!);
+    if (settings.soundOn) sound.playSfx(sfxFiles[event]!);
     if (settings.hapticsOn) haptics.play(_haptic[event]!);
   }
 
@@ -118,14 +119,7 @@ class FlameSoundPlayer implements SoundPlayer {
       FlameAudio.bgm.initialize();
       await FlameAudio.audioCache.loadAll([
         musicFile,
-        'exit.wav',
-        'blocked.wav',
-        'board.wav',
-        'depart.wav',
-        'win.wav',
-        'lose.wav',
-        'undo.wav',
-        'booster.wav',
+        ...FeedbackService.sfxFiles.values,
       ]);
     } catch (e) {
       debugPrint('Audio preload failed: $e');

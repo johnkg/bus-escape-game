@@ -14,7 +14,6 @@ class MenuScreen extends StatelessWidget {
   static const double _logoSize = 72;
   static const double _logoBadge = 120;
   static const double _trophySize = 18;
-  static const double _coinSize = 22;
   static const double _sideButtonWidth = 122;
   static const double _titleStroke = 8;
 
@@ -32,10 +31,9 @@ class MenuScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _Chip(
+                InfoChip(
                   icon: Icons.monetization_on,
                   iconColor: AppColors.gold,
-                  iconSize: _coinSize,
                   text: '${progress.coins}',
                   semanticLabel: '${progress.coins} coins',
                 ),
@@ -106,7 +104,7 @@ class MenuScreen extends StatelessWidget {
                 if (streak > 0)
                   Padding(
                     padding: const EdgeInsets.only(top: Gap.m),
-                    child: _Chip(
+                    child: InfoChip(
                       icon: streak >= ProgressService.streakRewardEvery
                           ? Icons.emoji_events_rounded
                           : Icons.local_fire_department_rounded,
@@ -181,57 +179,6 @@ class _SideButton extends StatelessWidget {
           ),
           ClayLabel(label, fontSize: FontSizes.label),
         ],
-      ),
-    );
-  }
-}
-
-/// A small dark pill with an icon and a value (coins, streak).
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.icon,
-    required this.iconColor,
-    required this.iconSize,
-    required this.text,
-    this.semanticLabel,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final double iconSize;
-  final String text;
-  final String? semanticLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: semanticLabel,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Gap.l,
-          vertical: Gap.xs,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.ink,
-          borderRadius: BorderRadius.circular(Radii.pill),
-          border: Border.all(color: AppColors.cardRim, width: Clay.rim / 2),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: iconColor, size: iconSize),
-            const SizedBox(width: Gap.s),
-            Text(
-              text,
-              style: const TextStyle(
-                color: Colors.white,
-                fontFamily: Fonts.display,
-                fontSize: FontSizes.label,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

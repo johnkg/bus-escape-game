@@ -283,7 +283,10 @@ void boosterTests() {
 
       await tester.tap(find.byKey(const Key('booster-undo')));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(progress.undoBoosters, 3); // nothing to undo, nothing spent
+      expect(
+        progress.boosterCount(Booster.undo),
+        3,
+      ); // nothing to undo, nothing spent
 
       final first = Solver.solve(game.level.toState()).order!.first;
       game.tapBus(first);
@@ -294,7 +297,7 @@ void boosterTests() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(game.session.state.moves, 0);
       expect(game.session.state.buses.length, game.level.buses.length);
-      expect(progress.undoBoosters, 2);
+      expect(progress.boosterCount(Booster.undo), 2);
     });
 
     testWidgets('hint highlights a good bus, spends a booster, costs stars', (
@@ -308,7 +311,7 @@ void boosterTests() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(game.hintedBusId, expected);
-      expect(progress.hintBoosters, 2);
+      expect(progress.boosterCount(Booster.hint), 2);
 
       for (final id in Solver.solve(game.session.state).order!) {
         game.tapBus(id);
@@ -328,7 +331,7 @@ void boosterTests() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(game.hintedBusId, isNull);
-      expect(progress.hintBoosters, 0);
+      expect(progress.boosterCount(Booster.hint), 0);
     });
 
     testWidgets('undo does nothing at zero boosters', (tester) async {
@@ -341,7 +344,7 @@ void boosterTests() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(game.session.state.moves, 1); // still there
-      expect(progress.undoBoosters, 0);
+      expect(progress.boosterCount(Booster.undo), 0);
     });
   });
 }
@@ -450,7 +453,7 @@ void newBoosterTests() {
       await tester.tap(find.byKey(const Key('booster-refresh')));
       await tester.pump(const Duration(milliseconds: 200));
 
-      expect(progress.refreshBoosters, 2);
+      expect(progress.boosterCount(Booster.refresh), 2);
       expect(game.session.helpUsed, 1);
       expect(game.session.state.buses.length, before.length);
       final moved = game.session.state.buses
@@ -473,13 +476,13 @@ void newBoosterTests() {
       await tester.tap(find.byKey(const Key('booster-clear')));
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.byKey(const Key('clear-banner')), findsOneWidget);
-      expect(progress.clearBoosters, 3); // not spent yet
+      expect(progress.boosterCount(Booster.clear), 3); // not spent yet
 
       game.tapBus(0);
       await runFor(tester, 1.2);
 
       expect(game.session.state.busById(0), isNull); // lifted out
-      expect(progress.clearBoosters, 2);
+      expect(progress.boosterCount(Booster.clear), 2);
       expect(find.byKey(const Key('clear-banner')), findsNothing);
     });
 
@@ -496,7 +499,7 @@ void newBoosterTests() {
       game.tapBus(0); // blocked: just shakes
       await tester.pump(const Duration(milliseconds: 300));
       expect(game.session.state.busById(0), isNotNull);
-      expect(progress.clearBoosters, 3);
+      expect(progress.boosterCount(Booster.clear), 3);
     });
 
     testWidgets('sort fills a parked vehicle; disabled when pointless', (
@@ -508,7 +511,7 @@ void newBoosterTests() {
       // Nothing parked yet, so Sort has nobody to help.
       await tester.tap(find.byKey(const Key('booster-sort')));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(progress.sortBoosters, 3);
+      expect(progress.boosterCount(Booster.sort), 3);
 
       // Airlift the red bus: it parks, but blue passengers are in front.
       game.clearArmed.value = true;
@@ -519,7 +522,7 @@ void newBoosterTests() {
       await tester.tap(find.byKey(const Key('booster-sort')));
       await runFor(tester, 1.5);
 
-      expect(progress.sortBoosters, 2);
+      expect(progress.boosterCount(Booster.sort), 2);
       expect(game.session.state.queue.length, queueBefore - 4); // 4 reds
     });
   });

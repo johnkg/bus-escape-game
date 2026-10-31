@@ -35,6 +35,15 @@ class Bus {
 
   int get capacity => length * seatsPerCell;
 
+  Bus copyWith({int? id, int? row, int? col, Direction? dir}) => Bus(
+    id: id ?? this.id,
+    colorIndex: colorIndex,
+    row: row ?? this.row,
+    col: col ?? this.col,
+    length: length,
+    dir: dir ?? this.dir,
+  );
+
   List<Cell> get cells => [
     for (var i = 0; i < length; i++)
       dir.isHorizontal ? (row, col + i) : (row + i, col),

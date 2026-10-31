@@ -1,9 +1,9 @@
 import 'dart:math';
 
 import 'bus.dart';
-import 'direction.dart';
 import 'game_state.dart';
 import 'level.dart';
+import 'placement.dart';
 import 'rng.dart';
 import 'rules.dart';
 import 'vehicle_kind.dart';
@@ -165,27 +165,27 @@ class LevelGenerator {
   /// [difficulty] defaults to [levelNumber]; the repository lowers it so
   /// generated levels start easy after the handmade tutorial.
   static Level generate(int levelNumber, {int? difficulty}) {
-    final c = configFor(difficulty ?? levelNumber);
+    final config = configFor(difficulty ?? levelNumber);
     final rng = Rng(levelNumber * _seedStride + _seedOffset);
 
-    final shape = c.irregular ? _carve(c, rng) : _rect(c);
-    final exitOrder = _placeVehicles(c, shape, rng);
-    final queue = _buildQueue(c, exitOrder, rng);
+    final shape = config.irregular ? _carve(config, rng) : _rect(config);
+    final exitOrder = _placeVehicles(config, shape, rng);
+    final queue = _buildQueue(config, exitOrder, rng);
 
     return Level(
       id: levelNumber,
-      rows: c.rows,
-      cols: c.cols,
+      rows: config.rows,
+      cols: config.cols,
       buses: exitOrder,
       queue: queue,
-      laneSlots: c.laneSlots,
+      laneSlots: config.laneSlots,
       shape: shape,
       solution: [for (final b in exitOrder) b.id],
     );
   }
 
-  static List<String> _rect(LevelConfig c) =>
-      List.filled(c.rows, Level.lotCell * c.cols);
+  static List<String> _rect(LevelConfig config) =>
+      List.filled(config.rows, Level.lotCell * config.cols);
 
   /// Outline exponents: 2 is an ellipse, 4 a squircle.
   static const double _minRoundness = 2;
@@ -203,26 +203,34 @@ class LevelGenerator {
   static const double _biteChance = 0.7;
 
   /// A rounded blob with a random bite taken out of an edge.
-  static List<String> _carve(LevelConfig c, Rng rng) {
+  static List<String> _carve(LevelConfig config, Rng rng) {
     final p = _minRoundness + rng.nextDouble() * _roundnessRange;
     const centre = 0.5; // sample each cell at its middle
     final grid = [
-      for (var r = 0; r < c.rows; r++)
+      for (var r = 0; r < config.rows; r++)
         [
-          for (var col = 0; col < c.cols; col++)
-            (pow(((col + centre) - c.cols / 2).abs() / (c.cols / 2), p) +
-                    pow(((r + centre) - c.rows / 2).abs() / (c.rows / 2), p)) <=
+          for (var col = 0; col < config.cols; col++)
+            (pow(
+                      ((col + centre) - config.cols / 2).abs() /
+                          (config.cols / 2),
+                      p,
+                    ) +
+                    pow(
+                      ((r + centre) - config.rows / 2).abs() /
+                          (config.rows / 2),
+                      p,
+                    )) <=
                 _outlineSlack,
         ],
     ];
     // One or two bites make the outline lopsided.
     for (var b = 0; b < 1 + rng.nextInt(_extraBites + 1); b++) {
-      final r0 = rng.nextInt(c.rows - 1);
-      final c0 = rng.nextInt(c.cols - 1);
-      for (var r = r0; r < min(c.rows, r0 + _biteRows); r++) {
+      final r0 = rng.nextInt(config.rows - 1);
+      final c0 = rng.nextInt(config.cols - 1);
+      for (var r = r0; r < min(config.rows, r0 + _biteRows); r++) {
         for (
           var col = c0;
-          col < min(c.cols, c0 + 1 + rng.nextInt(_extraBiteCols + 1));
+          col < min(config.cols, c0 + 1 + rng.nextInt(_extraBiteCols + 1));
           col++
         ) {
           if (rng.chance(_biteChance)) grid[r][col] = false;
@@ -239,8 +247,13 @@ class LevelGenerator {
   static const int _placementTries = 250;
 
   /// Vehicles in exit order (index 0 leaves first), ids = exit index.
-  static List<Bus> _placeVehicles(LevelConfig c, List<String> shape, Rng rng) {
-    bool inShape(int r, int col) => lotHasCell(shape, c.rows, c.cols, r, col);
+  static List<Bus> _placeVehicles(
+    LevelConfig config,
+    List<String> shape,
+    Rng rng,
+  ) {
+    bool inShape(int r, int col) =>
+        lotHasCell(shape, config.rows, config.cols, r, col);
 
     final lotCells = shape.fold<int>(
       0,
@@ -249,63 +262,48 @@ class LevelGenerator {
     final occupied = <Cell>{};
     final placed = <Bus>[]; // last-to-exit first
 
-    while (placed.length < c.maxVehicles &&
-        occupied.length < lotCells * c.fill) {
-      Bus? found;
-      for (var t = 0; t < _placementTries && found == null; t++) {
-        var length = rng.chance(c.busChance)
-            ? VehicleKind.coasterLength
-            : VehicleKind.sedanLength;
-        if (c.longBusChance > 0 && rng.chance(c.longBusChance)) {
-          length = VehicleKind.busLength;
-        }
-        // Services are a sedan-sized police car or ambulance, or a
-        // coaster-sized fire truck; their passengers only board their own
-        // vehicle.
-        int? service;
-        if (c.fireChance > 0 && rng.chance(c.fireChance)) {
-          service = fireColor;
-          length = VehicleKind.coasterLength;
-        } else if (c.policeChance > 0 && rng.chance(c.policeChance)) {
-          service = policeColor;
-          length = VehicleKind.sedanLength;
-        } else if (c.ambulanceChance > 0 && rng.chance(c.ambulanceChance)) {
-          service = ambulanceColor;
-          length = VehicleKind.sedanLength;
-        }
-        final dir = Direction.values[rng.nextInt(Direction.values.length)];
-        final maxRow = dir.isHorizontal ? c.rows : c.rows - length + 1;
-        final maxCol = dir.isHorizontal ? c.cols - length + 1 : c.cols;
-        final bus = Bus(
-          id: placed.length,
-          colorIndex: service ?? rng.nextInt(c.colorCount),
-          row: rng.nextInt(maxRow),
-          col: rng.nextInt(maxCol),
-          length: length,
-          dir: dir,
-        );
-        if (!bus.cells.every((cell) => inShape(cell.$1, cell.$2))) continue;
-        if (bus.cells.any(occupied.contains)) continue;
-        if (bus.pathCells(c.rows, c.cols).any(occupied.contains)) continue;
-        found = bus;
-      }
+    while (placed.length < config.maxVehicles &&
+        occupied.length < lotCells * config.fill) {
+      final found = placeRandomly(
+        rng: rng,
+        id: placed.length,
+        spec: () => _randomVehicle(config, rng),
+        rows: config.rows,
+        cols: config.cols,
+        onLot: inShape,
+        occupied: occupied,
+        tries: _placementTries,
+      );
       if (found == null) break; // nothing else fits
       placed.add(found);
       occupied.addAll(found.cells);
     }
 
     final order = placed.reversed.toList();
-    return [
-      for (var i = 0; i < order.length; i++)
-        Bus(
-          id: i,
-          colorIndex: order[i].colorIndex,
-          row: order[i].row,
-          col: order[i].col,
-          length: order[i].length,
-          dir: order[i].dir,
-        ),
-    ];
+    return [for (var i = 0; i < order.length; i++) order[i].copyWith(id: i)];
+  }
+
+  /// A random vehicle for [config]: a sedan, coaster or bus in a random color,
+  /// or a service vehicle. Services are a sedan-sized police car or
+  /// ambulance, or a coaster-sized fire truck; their passengers only board
+  /// their own vehicle.
+  static VehicleSpec _randomVehicle(LevelConfig config, Rng rng) {
+    var length = rng.chance(config.busChance)
+        ? VehicleKind.coasterLength
+        : VehicleKind.sedanLength;
+    if (config.longBusChance > 0 && rng.chance(config.longBusChance)) {
+      length = VehicleKind.busLength;
+    }
+    if (config.fireChance > 0 && rng.chance(config.fireChance)) {
+      return (length: VehicleKind.coasterLength, pickColor: () => fireColor);
+    }
+    if (config.policeChance > 0 && rng.chance(config.policeChance)) {
+      return (length: VehicleKind.sedanLength, pickColor: () => policeColor);
+    }
+    if (config.ambulanceChance > 0 && rng.chance(config.ambulanceChance)) {
+      return (length: VehicleKind.sedanLength, pickColor: () => ambulanceColor);
+    }
+    return (length: length, pickColor: () => rng.nextInt(config.colorCount));
   }
 
   /// Plays [exitOrder] against the real rules while inventing the queue.
@@ -318,12 +316,16 @@ class LevelGenerator {
   /// Safety stop for [_buildQueue]; real levels need a few hundred steps.
   static const int _maxQueueSteps = 100000;
 
-  static List<int> _buildQueue(LevelConfig c, List<Bus> exitOrder, Rng rng) {
+  static List<int> _buildQueue(
+    LevelConfig config,
+    List<Bus> exitOrder,
+    Rng rng,
+  ) {
     var s = GameState(
-      rows: c.rows,
-      cols: c.cols,
+      rows: config.rows,
+      cols: config.cols,
       buses: exitOrder,
-      lane: List<ParkedBus?>.filled(c.laneSlots, null),
+      lane: List<ParkedBus?>.filled(config.laneSlots, null),
       queue: const [],
     );
     final queue = <int>[];
@@ -355,20 +357,21 @@ class LevelGenerator {
         guard++ < _maxQueueSteps) {
       final waiting = parkedWithSeats();
       final parkedCount = s.lane.where((p) => p != null).length;
-      final room = c.laneSlots - parkedCount; // free slots right now
+      final room = config.laneSlots - parkedCount; // free slots right now
       final remaining = exitOrder.length - next;
 
-      // Option B: ask for a vehicle still in the jam. Only legal if the
+      // Ask for a vehicle still in the jam. Only legal if the
       // lane can hold everything that must leave before it.
       var reach = 0;
       if (remaining > 0 && room > 0) {
         final canGo = min(remaining, room);
         reach = 1 + rng.nextInt(canGo); // exits needed, 1..canGo
       }
-      final wantB = reach > 0 && (waiting.isEmpty || rng.chance(c.mix));
+      final askForJammed =
+          reach > 0 && (waiting.isEmpty || rng.chance(config.mix));
 
       final int color;
-      if (wantB) {
+      if (askForJammed) {
         color = exitOrder[next + reach - 1].colorIndex;
       } else if (waiting.isNotEmpty) {
         color = waiting[rng.nextInt(waiting.length)].colorIndex;

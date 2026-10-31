@@ -43,11 +43,7 @@ class _GameScreenState extends State<GameScreen> {
   late BusEscapeGame _game;
   bool _showResult = false;
   bool _recorded = false;
-  bool _rewarded = false;
-  int _stars = 0;
-  int _coinsEarned = 0;
-  int _streak = 0;
-  bool _fast = false;
+  _WinSummary _win = _WinSummary();
   String? _tip;
   bool _paused = false;
 
@@ -77,11 +73,7 @@ class _GameScreenState extends State<GameScreen> {
     _tip = _firstTimeTips(progress, timed: limit != null);
     _showResult = false;
     _recorded = false;
-    _rewarded = false;
-    _stars = 0;
-    _coinsEarned = 0;
-    _streak = 0;
-    _fast = false;
+    _win = _WinSummary();
     _paused = false;
     _game.onUnlockRequested = _unlockSlot;
     _game.onAirlift = () => progress.useBooster(Booster.clear);
@@ -134,18 +126,18 @@ class _GameScreenState extends State<GameScreen> {
   Future<void> _recordWin(int moves, int stars) async {
     final progress = ProgressScope.read(context);
     if (widget.practice) {
-      setState(() => _stars = stars);
+      setState(() => _win.stars = stars);
       return;
     }
     final date = widget.daily;
     if (date != null) {
-      setState(() => _stars = stars);
+      setState(() => _win.stars = stars);
       final result = await progress.recordDaily(date);
       if (mounted) {
         setState(() {
-          _coinsEarned = result.coins;
-          _rewarded = result.boosters;
-          _streak = progress.dailyStreak(date);
+          _win.coins = result.coins;
+          _win.rewarded = result.boosters;
+          _win.streak = progress.dailyStreak(date);
         });
       }
       return;
@@ -155,9 +147,9 @@ class _GameScreenState extends State<GameScreen> {
     final fast = _game.timeFraction >= ProgressService.fastFinishShare;
     if (fast && coins > 0) coins += ProgressService.fastFinishCoins;
     setState(() {
-      _stars = stars;
-      _coinsEarned = coins;
-      _fast = fast && coins > 0;
+      _win.stars = stars;
+      _win.coins = coins;
+      _win.fast = fast && coins > 0;
     });
     final rewarded = await progress.recordWin(
       widget.levelNumber,
@@ -165,25 +157,37 @@ class _GameScreenState extends State<GameScreen> {
       stars: stars,
     );
     if (coins > 0) await progress.addCoins(coins);
-    if (mounted) setState(() => _rewarded = rewarded);
+    if (mounted) setState(() => _win.rewarded = rewarded);
   }
 
   Future<void> _useUndo() async {
     final progress = ProgressScope.read(context);
-    if (progress.undoBoosters <= 0 || !_game.undo()) return;
+    if (progress.boosterCount(Booster.undo) <= 0 || !_game.undo()) return;
     FeedbackScope.read(context).emit(GameEvent.undo);
     await progress.useBooster(Booster.undo);
   }
 
-  Future<void> _useHint() async {
+  /// Runs [apply] if a [booster] is left and spends it when [apply]
+  /// succeeds; otherwise tells the player [whyNot].
+  Future<void> _useBooster(
+    Booster booster,
+    bool Function() apply,
+    String whyNot,
+  ) async {
     final progress = ProgressScope.read(context);
-    if (progress.hintBoosters <= 0) return;
-    if (_game.useHint() == null) {
-      _snack('No safe move left. Try Undo.');
+    if (progress.boosterCount(booster) <= 0) return;
+    if (!apply()) {
+      _snack(whyNot);
       return;
     }
-    await progress.useBooster(Booster.hint);
+    await progress.useBooster(booster);
   }
+
+  Future<void> _useHint() => _useBooster(
+    Booster.hint,
+    () => _game.useHint() != null,
+    'No safe move left. Try Undo.',
+  );
 
   static const Duration _snackDuration = Duration(seconds: 2);
 
@@ -193,32 +197,23 @@ class _GameScreenState extends State<GameScreen> {
     ).showSnackBar(SnackBar(content: Text(message), duration: _snackDuration));
   }
 
-  Future<void> _useRefresh() async {
-    final progress = ProgressScope.read(context);
-    if (progress.refreshBoosters <= 0) return;
-    if (!_game.refresh()) {
-      _snack("Can't reshuffle right now.");
-      return;
-    }
-    await progress.useBooster(Booster.refresh);
-  }
+  Future<void> _useRefresh() =>
+      _useBooster(Booster.refresh, _game.refresh, "Can't reshuffle right now.");
 
   /// Clear is armed first; the booster is only spent once a vehicle is lifted.
   void _toggleClear() {
     final progress = ProgressScope.read(context);
-    if (!_game.clearArmed.value && progress.clearBoosters <= 0) return;
+    if (!_game.clearArmed.value && progress.boosterCount(Booster.clear) <= 0) {
+      return;
+    }
     _game.toggleClear();
   }
 
-  Future<void> _useSort() async {
-    final progress = ProgressScope.read(context);
-    if (progress.sortBoosters <= 0) return;
-    if (!_game.sortQueue()) {
-      _snack('Nobody in the queue matches a parked vehicle.');
-      return;
-    }
-    await progress.useBooster(Booster.sort);
-  }
+  Future<void> _useSort() => _useBooster(
+    Booster.sort,
+    _game.sortQueue,
+    'Nobody in the queue matches a parked vehicle.',
+  );
 
   /// Tapping a locked lane slot (or the lose card button) buys it with coins.
   Future<void> _unlockSlot() async {
@@ -314,59 +309,20 @@ class _GameScreenState extends State<GameScreen> {
                           BoosterBar(
                             clearArmed: _game.clearArmed,
                             tilesFor: (armed) => [
-                              BoosterTile(
-                                key: const Key('booster-undo'),
-                                icon: Icons.undo,
-                                label: 'Undo',
-                                count: progress.undoBoosters,
-                                enabled: _game.canUndo,
-                                onPressed: _useUndo,
-                              ),
-                              BoosterTile(
-                                key: const Key('booster-hint'),
-                                icon: Icons.lightbulb_outline,
-                                label: 'Hint',
-                                count: progress.hintBoosters,
-                                enabled: _game.canHint,
-                                onPressed: _useHint,
-                              ),
-                              BoosterTile(
-                                key: const Key('booster-refresh'),
-                                icon: Icons.shuffle,
-                                label: 'Refresh',
-                                count: progress.refreshBoosters,
-                                enabled: _game.canRefresh,
-                                onPressed: _useRefresh,
-                              ),
-                              BoosterTile(
-                                key: const Key('booster-clear'),
-                                icon: Icons.flight,
-                                label: 'Clear',
-                                count: progress.clearBoosters,
-                                enabled: _game.canClear,
-                                armed: armed,
-                                onPressed: _toggleClear,
-                              ),
-                              BoosterTile(
-                                key: const Key('booster-sort'),
-                                icon: Icons.sort,
-                                label: 'Sort',
-                                count: progress.sortBoosters,
-                                enabled: _game.canSort,
-                                onPressed: _useSort,
-                              ),
+                              for (final booster in Booster.values)
+                                _boosterTile(progress, booster, armed: armed),
                             ],
                           ),
                           if (_showResult)
                             ResultOverlay(
                               won: s.status == GameStatus.won,
-                              stars: _stars,
-                              rewarded: _rewarded,
-                              coins: _coinsEarned,
+                              stars: _win.stars,
+                              rewarded: _win.rewarded,
+                              coins: _win.coins,
                               daily: widget.daily != null,
                               timedOut: _game.timeUp.value,
-                              fast: _fast,
-                              streak: _streak,
+                              fast: _win.fast,
+                              streak: _win.streak,
                               onNext: () => _goTo(widget.levelNumber + 1),
                               onRetry: _retry,
                               onMenu: () =>
@@ -412,10 +368,67 @@ class _GameScreenState extends State<GameScreen> {
 
   Widget _undoButton(ProgressService progress, Key key) => BoosterButton(
     key: key,
-    icon: Icons.undo,
-    label: 'Undo',
-    count: progress.undoBoosters,
+    icon: _boosterIcons[Booster.undo]!,
+    label: _boosterLabel(Booster.undo),
+    count: progress.boosterCount(Booster.undo),
     enabled: _game.canUndo,
     onPressed: _useUndo,
   );
+
+  /// One tile of the booster bar. Clear is [armed] while it waits for the
+  /// player to pick a vehicle.
+  Widget _boosterTile(
+    ProgressService progress,
+    Booster booster, {
+    required bool armed,
+  }) => BoosterTile(
+    key: Key('booster-${booster.name}'),
+    icon: _boosterIcons[booster]!,
+    label: _boosterLabel(booster),
+    count: progress.boosterCount(booster),
+    armed: booster == Booster.clear && armed,
+    enabled: switch (booster) {
+      Booster.undo => _game.canUndo,
+      Booster.hint => _game.canHint,
+      Booster.refresh => _game.canRefresh,
+      Booster.clear => _game.canClear,
+      Booster.sort => _game.canSort,
+    },
+    onPressed: switch (booster) {
+      Booster.undo => _useUndo,
+      Booster.hint => _useHint,
+      Booster.refresh => _useRefresh,
+      Booster.clear => _toggleClear,
+      Booster.sort => _useSort,
+    },
+  );
+
+  static const Map<Booster, IconData> _boosterIcons = {
+    Booster.undo: Icons.undo,
+    Booster.hint: Icons.lightbulb_outline,
+    Booster.refresh: Icons.shuffle,
+    Booster.clear: Icons.flight,
+    Booster.sort: Icons.sort,
+  };
+
+  /// "Undo", "Hint", ... from the booster's name.
+  static String _boosterLabel(Booster booster) =>
+      booster.name[0].toUpperCase() + booster.name.substring(1);
+}
+
+/// What the result card shows after a win; filled in as the win is saved.
+class _WinSummary {
+  int stars = 0;
+
+  /// Coins earned by this win.
+  int coins = 0;
+
+  /// Daily challenge streak after this win.
+  int streak = 0;
+
+  /// Won a timed level with plenty of clock left.
+  bool fast = false;
+
+  /// The win gifted one of every booster.
+  bool rewarded = false;
 }

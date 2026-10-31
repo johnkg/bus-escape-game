@@ -44,10 +44,7 @@ class ProgressService extends ChangeNotifier {
   /// Best star rating earned on [level] (0 = not cleared).
   int stars(int level) => _prefs.getInt(_starsKey(level)) ?? 0;
 
-  int get totalStars => _prefs
-      .getKeys()
-      .where((k) => k.startsWith(_starsPrefix))
-      .fold(0, (sum, k) => sum + (_prefs.getInt(k) ?? 0));
+  int get totalStars => _starCounts().fold(0, (sum, n) => sum + n);
 
   int? bestMoves(int level) => _prefs.getInt(_bestKey(level));
 
@@ -99,11 +96,6 @@ class ProgressService extends ChangeNotifier {
 
   int boosterCount(Booster b) =>
       _prefs.getInt(_boosterKey(b)) ?? startingBoosters;
-  int get undoBoosters => boosterCount(Booster.undo);
-  int get hintBoosters => boosterCount(Booster.hint);
-  int get refreshBoosters => boosterCount(Booster.refresh);
-  int get clearBoosters => boosterCount(Booster.clear);
-  int get sortBoosters => boosterCount(Booster.sort);
 
   /// Spends one booster; false if none are left.
   Future<bool> useBooster(Booster b) async {
@@ -112,11 +104,6 @@ class ProgressService extends ChangeNotifier {
     await _prefs.setInt(_boosterKey(b), n - 1);
     notifyListeners();
     return true;
-  }
-
-  Future<void> addBooster(Booster b, int amount) async {
-    await _prefs.setInt(_boosterKey(b), boosterCount(b) + amount);
-    notifyListeners();
   }
 
   /// True once the challenge for [date] has been cleared.

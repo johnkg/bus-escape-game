@@ -28,11 +28,6 @@ class HudTop extends StatelessWidget {
   final int coins;
   final VoidCallback onPause;
 
-  static const double _coinPadV = 5;
-  static const double _coinPadRight = 14;
-  static const double _coinIconSize = 22;
-  static const double _chipRim = 1.5;
-
   @override
   Widget build(BuildContext context) {
     return Positioned(
@@ -42,39 +37,12 @@ class HudTop extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
+          InfoChip(
             key: const Key('coin-chip'),
-            padding: const EdgeInsets.fromLTRB(
-              Gap.m,
-              _coinPadV,
-              _coinPadRight,
-              _coinPadV,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.ink,
-              borderRadius: BorderRadius.circular(Radii.pill),
-              border: Border.all(color: AppColors.cardRim, width: _chipRim),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.monetization_on,
-                  color: AppColors.gold,
-                  size: _coinIconSize,
-                ),
-                const SizedBox(width: Gap.s),
-                Text(
-                  '$coins',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontFamily: Fonts.display,
-                    fontSize: FontSizes.label,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+            icon: Icons.monetization_on,
+            iconColor: AppColors.gold,
+            text: '$coins',
+            semanticLabel: '$coins coins',
           ),
           Expanded(
             child: Column(
@@ -228,42 +196,25 @@ class _TimeChip extends StatelessWidget {
 
   /// The chip turns red at this many seconds left.
   static const int _lowSeconds = 10;
-  static const double _padH = 10;
+  static const int _secondsDigits = 2;
   static const double _iconSize = 15;
 
   @override
   Widget build(BuildContext context) {
-    final low = seconds <= _lowSeconds;
     final minutes = seconds ~/ Duration.secondsPerMinute;
     final secs = (seconds % Duration.secondsPerMinute).toString().padLeft(
-      2,
+      _secondsDigits,
       '0',
     );
-    final text = '$minutes:$secs';
-    return Container(
-      key: const Key('time-chip'),
-      margin: const EdgeInsets.only(top: Gap.xxs),
-      padding: const EdgeInsets.symmetric(horizontal: _padH, vertical: Gap.xxs),
-      decoration: BoxDecoration(
-        color: low ? AppColors.warning : AppColors.ink,
-        borderRadius: BorderRadius.circular(Radii.m),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.timer_rounded, color: Colors.white, size: _iconSize),
-          const SizedBox(width: Gap.xs),
-          Text(
-            text,
-            style: const TextStyle(
-              color: Colors.white,
-              fontFamily: Fonts.display,
-              fontSize: FontSizes.body,
-              fontWeight: FontWeight.w600,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(top: Gap.xxs),
+      child: InfoChip(
+        key: const Key('time-chip'),
+        icon: Icons.timer_rounded,
+        iconSize: _iconSize,
+        fontSize: FontSizes.body,
+        color: seconds <= _lowSeconds ? AppColors.warning : AppColors.ink,
+        text: '$minutes:$secs',
       ),
     );
   }

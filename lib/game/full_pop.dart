@@ -3,16 +3,18 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flutter/painting.dart' show TextStyle, FontWeight;
 
-import 'bus_escape_game.dart';
 import 'layers.dart';
+import 'paint_helpers.dart';
 import 'palette.dart';
+import 'timed_effect.dart';
 
 /// A short "FULL!" that floats up from a bay as its vehicle pulls away. It
 /// only decorates the departure; it never holds the vehicle back.
-class FullPop extends PositionComponent with HasGameReference<BusEscapeGame> {
-  FullPop({required this.slot}) : super(priority: Layer.fullPop);
+class FullPop extends TimedEffect {
+  FullPop({required this.slot})
+    : super(lifetime: _seconds, priority: Layer.fullPop);
 
-  static const double duration = 0.8;
+  static const double _seconds = 0.8;
 
   static const double _fontSize = 15;
   static const double _shadowBlur = 3;
@@ -37,25 +39,19 @@ class FullPop extends PositionComponent with HasGameReference<BusEscapeGame> {
   static const double _layerSize = 120;
 
   final int slot;
-  double _t = 0;
-
-  @override
-  void update(double dt) {
-    _t += dt;
-    if (_t >= duration) removeFromParent();
-  }
 
   @override
   void render(Canvas canvas) {
-    final p = (_t / duration).clamp(0.0, 1.0);
+    final p = progress;
     final c = game.layout.laneSlotRect(slot).center;
     final pop = p < _growFor
         ? _startScale + (1 - _startScale) / _growFor * p
         : 1.0;
     final alpha = p < _fadeFrom ? 1.0 : 1 - (p - _fadeFrom) / (1 - _fadeFrom);
-    canvas.saveLayer(
+    saveFadeLayer(
+      canvas,
       Rect.fromCenter(center: c, width: _layerSize, height: _layerSize),
-      Paint()..color = Color.fromRGBO(0, 0, 0, alpha),
+      alpha,
     );
     canvas.translate(c.dx, c.dy - _startLift - p * _rise);
     canvas.scale(pop);

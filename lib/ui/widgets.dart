@@ -411,6 +411,68 @@ class CountBadge extends StatelessWidget {
   }
 }
 
+/// A small dark pill with an icon and a value (coins, streak, clock).
+class InfoChip extends StatelessWidget {
+  const InfoChip({
+    super.key,
+    required this.icon,
+    required this.text,
+    this.iconColor = Colors.white,
+    this.iconSize = defaultIconSize,
+    this.fontSize = FontSizes.label,
+    this.color = AppColors.ink,
+    this.semanticLabel,
+  });
+
+  static const double defaultIconSize = 22;
+
+  final IconData icon;
+  final String text;
+  final Color iconColor;
+  final double iconSize;
+  final double fontSize;
+  final Color color;
+
+  /// Read by screen readers instead of [text], when the icon carries meaning.
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: semanticLabel,
+      excludeSemantics: semanticLabel != null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Gap.l,
+          vertical: Gap.xs,
+        ),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(Radii.pill),
+          border: Border.all(color: AppColors.cardRim, width: Clay.rim / 2),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: iconColor, size: iconSize),
+            const SizedBox(width: Gap.s),
+            Text(
+              text,
+              style: TextStyle(
+                color: Colors.white,
+                fontFamily: Fonts.display,
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Three stars, [stars] of them filled.
 class StarRow extends StatelessWidget {
   const StarRow({super.key, required this.stars, this.size = defaultSize});

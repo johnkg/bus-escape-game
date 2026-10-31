@@ -69,7 +69,8 @@ class ResultOverlay extends StatelessWidget {
             switch (stars) {
               GameSession.maxStars => 'Perfect!',
               GameSession.cleanStars =>
-                'No boosters. Avoid blocked taps for 3 stars.',
+                'No boosters. Avoid blocked taps for '
+                    '${GameSession.maxStars} stars.',
               _ => 'No boosters or hints for more stars.',
             },
             textAlign: TextAlign.center,
