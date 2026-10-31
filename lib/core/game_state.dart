@@ -11,6 +11,10 @@ class ParkedBus {
     this.boarded = 0,
   });
 
+  /// [bus] as it pulls into the lane, with every seat empty.
+  ParkedBus.fromBus(Bus bus)
+    : this(id: bus.id, colorIndex: bus.colorIndex, capacity: bus.capacity);
+
   final int id;
   final int colorIndex;
   final int capacity;

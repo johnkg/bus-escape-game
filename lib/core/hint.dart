@@ -6,7 +6,7 @@ class Hints {
   const Hints._();
 
   /// Small search budget so a hint answers instantly.
-  static const int defaultMaxNodes = 4000;
+  static const int _maxNodes = 4000;
 
   /// Id of a bus to tap next, or null if the game is over or the position
   /// can no longer be won.
@@ -15,13 +15,9 @@ class Hints {
   /// limit; then [fallbackOrder] (the level's known solution) and finally the
   /// first exitable vehicle the front passenger is waiting for are used as a
   /// best guess.
-  static int? nextBus(
-    GameState s, {
-    List<int>? fallbackOrder,
-    int maxNodes = defaultMaxNodes,
-  }) {
+  static int? nextBus(GameState s, {List<int>? fallbackOrder}) {
     if (s.status != GameStatus.playing) return null;
-    final r = Solver.solve(s, maxNodes: maxNodes);
+    final r = Solver.solve(s, maxNodes: _maxNodes);
     if (r.order != null && r.order!.isNotEmpty) return r.order!.first;
     if (!r.exhausted) return null; // proven unwinnable
 

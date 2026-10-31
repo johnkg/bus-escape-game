@@ -1,7 +1,7 @@
 import 'bus.dart';
-import 'direction.dart';
 import 'game_state.dart';
 import 'level.dart';
+import 'placement.dart';
 import 'rng.dart';
 import 'rules.dart';
 import 'solver.dart';
@@ -26,11 +26,14 @@ class RefreshResult {
 class Refresher {
   const Refresher._();
 
+  /// Refresh needs at least this many vehicles to swap around.
+  static const int minBuses = 2;
+
   /// Search budget for finding a winning order to place against.
-  static const int defaultMaxNodes = 20000;
+  static const int _maxNodes = 20000;
 
   /// Whole re-placements tried before giving up.
-  static const int defaultAttempts = 40;
+  static const int _attempts = 40;
 
   /// Random spots tried per vehicle within one re-placement.
   static const int _placementTries = 400;
@@ -39,14 +42,14 @@ class Refresher {
     GameState s,
     Rng rng, {
     List<int>? fallbackOrder,
-    int maxNodes = defaultMaxNodes,
-    int attempts = defaultAttempts,
   }) {
-    if (s.status != GameStatus.playing || s.buses.length < 2) return null;
-    final order = _winningOrder(s, fallbackOrder, maxNodes);
+    if (s.status != GameStatus.playing || s.buses.length < minBuses) {
+      return null;
+    }
+    final order = _winningOrder(s, fallbackOrder);
     if (order == null) return null;
 
-    for (var i = 0; i < attempts; i++) {
+    for (var i = 0; i < _attempts; i++) {
       final placed = _place(s, order, rng);
       if (placed != null) {
         return RefreshResult(s.copyWith(buses: placed), order);
@@ -55,12 +58,8 @@ class Refresher {
     return null;
   }
 
-  static List<int>? _winningOrder(
-    GameState s,
-    List<int>? fallbackOrder,
-    int maxNodes,
-  ) {
-    final found = Solver.solve(s, maxNodes: maxNodes).order;
+  static List<int>? _winningOrder(GameState s, List<int>? fallbackOrder) {
+    final found = Solver.solve(s, maxNodes: _maxNodes).order;
     if (found != null && _wins(s, found)) return found;
     if (fallbackOrder != null) {
       final remaining = {for (final b in s.buses) b.id};
@@ -87,32 +86,25 @@ class Refresher {
   }
 
   static List<Bus>? _place(GameState s, List<int> order, Rng rng) {
-    bool inLot(int r, int c) => lotHasCell(s.shape, s.rows, s.cols, r, c);
+    bool onLot(int r, int c) => lotHasCell(s.shape, s.rows, s.cols, r, c);
 
-    final original = {for (final b in s.buses) b.id: b};
+    final byId = {for (final b in s.buses) b.id: b};
     final occupied = <Cell>{};
     final placed = <int, Bus>{};
 
     for (final id in order.reversed) {
-      final o = original[id]!;
-      Bus? found;
-      for (var t = 0; t < _placementTries && found == null; t++) {
-        final dir = Direction.values[rng.nextInt(Direction.values.length)];
-        final maxRow = dir.isHorizontal ? s.rows : s.rows - o.length + 1;
-        final maxCol = dir.isHorizontal ? s.cols - o.length + 1 : s.cols;
-        final bus = Bus(
-          id: o.id,
-          colorIndex: o.colorIndex,
-          row: rng.nextInt(maxRow),
-          col: rng.nextInt(maxCol),
-          length: o.length,
-          dir: dir,
-        );
-        if (!bus.cells.every((c) => inLot(c.$1, c.$2))) continue;
-        if (bus.cells.any(occupied.contains)) continue;
-        if (bus.pathCells(s.rows, s.cols).any(occupied.contains)) continue;
-        found = bus;
-      }
+      final original = byId[id]!;
+      final found = placeRandomly(
+        rng: rng,
+        id: id,
+        spec: () =>
+            (length: original.length, pickColor: () => original.colorIndex),
+        rows: s.rows,
+        cols: s.cols,
+        onLot: onLot,
+        occupied: occupied,
+        tries: _placementTries,
+      );
       if (found == null) return null;
       placed[id] = found;
       occupied.addAll(found.cells);

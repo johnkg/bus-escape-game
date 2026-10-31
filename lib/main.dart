@@ -6,7 +6,6 @@ import 'services/progress_service.dart';
 import 'ui/app_theme.dart';
 import 'ui/feedback_scope.dart';
 import 'ui/menu_screen.dart';
-import 'ui/monetization_scope.dart';
 import 'ui/progress_scope.dart';
 
 Future<void> main() async {
@@ -41,14 +40,11 @@ class BusEscapeApp extends StatelessWidget {
       progress: progress,
       child: FeedbackScope(
         feedback: feedback,
-        // No ads or purchases yet: the no-op services are the defaults.
-        child: MonetizationScope(
-          child: MaterialApp(
-            title: 'Bus Escape',
-            debugShowCheckedModeBanner: false,
-            theme: buildAppTheme(),
-            home: const MenuScreen(),
-          ),
+        child: MaterialApp(
+          title: 'Bus Escape',
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+          home: const MenuScreen(),
         ),
       ),
     );

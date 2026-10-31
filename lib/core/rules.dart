@@ -43,11 +43,7 @@ class Rules {
     if (slot < 0) return TapResult(s, moved: false);
 
     final lane = [...s.lane];
-    lane[slot] = ParkedBus(
-      id: bus.id,
-      colorIndex: bus.colorIndex,
-      capacity: bus.capacity,
-    );
+    lane[slot] = ParkedBus.fromBus(bus);
     final next = board(
       s.copyWith(
         buses: [

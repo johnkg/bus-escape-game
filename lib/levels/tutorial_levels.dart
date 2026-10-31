@@ -5,7 +5,7 @@ import '../core/core.dart';
 /// Handmade tutorial levels 1–10, kept as JSON so they are easy to edit.
 ///
 /// `queueRuns` is `[color, count]` pairs. Colors: 0 red, 1 blue, 2 green,
-/// 3 yellow, 4 purple, 5 orange. Buses: `row`/`col` is the top-left cell.
+/// 3 yellow, 4 purple, 5 pink. Buses: `row`/`col` is the top-left cell.
 class TutorialLevels {
   const TutorialLevels._();
 

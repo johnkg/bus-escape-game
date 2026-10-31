@@ -27,6 +27,9 @@ class BusComponent extends PositionComponent
   static int _flyPriority = Layer.flying;
 
   final Bus bus;
+
+  /// How this vehicle looks once parked in the lane.
+  late final ParkedBus _parked = ParkedBus.fromBus(bus);
   Vector2? _home;
 
   /// Seconds the hint glow has left.
@@ -268,12 +271,7 @@ class BusComponent extends PositionComponent
       size = Vector2(slot.width, slot.height);
       return;
     }
-    final parked = ParkedBus(
-      id: bus.id,
-      colorIndex: bus.colorIndex,
-      capacity: bus.capacity,
-    );
-    final lane = laneVehicleSize(slot, parked); // nose up: (wide, long)
+    final lane = laneVehicleSize(slot, _parked); // nose up: (wide, long)
     final long = bus.length * cell + (lane.height - bus.length * cell) * morph;
     final wide = cell + (lane.width - cell) * morph;
     size = h.isHorizontal ? Vector2(long, wide) : Vector2(wide, long);
@@ -320,11 +318,7 @@ class BusComponent extends PositionComponent
       paintLaneVehicle(
         canvas,
         Rect.fromLTWH(0, 0, size.x, size.y),
-        ParkedBus(
-          id: bus.id,
-          colorIndex: bus.colorIndex,
-          capacity: bus.capacity,
-        ),
+        _parked,
         symbols: game.showSymbols,
       );
       return;

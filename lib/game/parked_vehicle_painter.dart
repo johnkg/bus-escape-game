@@ -5,9 +5,10 @@ import 'package:flame/components.dart';
 import 'package:flutter/painting.dart' show TextStyle, FontWeight;
 
 import '../core/core.dart';
+import 'paint_helpers.dart';
 import 'palette.dart';
+import 'passenger_painter.dart';
 import 'symbols.dart';
-import 'vehicle_painter.dart';
 
 // Parked vehicles: seen from above, nose up, roof open so the seats show.
 
@@ -100,19 +101,20 @@ const double _personLift = 1;
 }
 
 /// Where seat [index] of a parked vehicle is, and how big its passenger is.
-({Offset center, double scale}) laneSeat(Rect slot, ParkedBus p, int index) {
-  final seat = _seatAt(_laneBody(slot, p).cab, p, index);
-  return (
-    center: seat.center.translate(0, -_personLift),
-    scale: seat.size / _personSeatSize,
-  );
-}
+({Offset center, double scale}) laneSeat(Rect slot, ParkedBus p, int index) =>
+    _passengerOn(_seatAt(_laneBody(slot, p).cab, p, index));
+
+/// Where a passenger sits on [seat], and at what scale.
+({Offset center, double scale}) _passengerOn(
+  ({Offset center, double size}) seat,
+) => (
+  center: seat.center.translate(0, -_personLift),
+  scale: seat.size / _personSeatSize,
+);
 
 // Shell shading.
 const double _roundCorner = 0.3;
 const double _squareCorner = 0.2; // bus and fire truck
-const Offset _shadowOffset = Offset(1.5, 2.5);
-const double _shadowSpread = 1;
 const double _shellEdge = 1.5;
 const double _shellEdgeDarken = -0.25;
 const double _glassRadius = 3;
@@ -137,13 +139,7 @@ void paintLaneVehicle(
     body.width * (square ? _squareCorner : _roundCorner),
   );
 
-  canvas.drawRRect(
-    RRect.fromRectAndRadius(
-      body.shift(_shadowOffset).inflate(_shadowSpread),
-      radius,
-    ),
-    Paint()..color = shadowColor,
-  );
+  paintGroundShadow(canvas, body, radius);
   final shell = RRect.fromRectAndRadius(body, radius);
   canvas.drawRRect(shell, Paint()..color = color);
   canvas.drawRRect(
@@ -186,11 +182,12 @@ void paintLaneVehicle(
       Paint()..color = seatColor,
     );
     if (i < p.boarded) {
+      final passenger = _passengerOn(seat);
       paintPassenger(
         canvas,
-        seat.center.translate(0, -_personLift),
+        passenger.center,
         p.colorIndex,
-        scale: seat.size / _personSeatSize,
+        scale: passenger.scale,
       );
     }
   }

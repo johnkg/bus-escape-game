@@ -12,11 +12,11 @@ void main() {
     final p = await load();
     expect(p.unlockedLevel, 1);
     expect(p.bestMoves(1), isNull);
-    expect(p.undoBoosters, 3);
+    expect(p.boosterCount(Booster.undo), 3);
     for (final b in Booster.values) {
       expect(p.boosterCount(b), 3, reason: b.name);
     }
-    expect(p.hintBoosters, 3);
+    expect(p.boosterCount(Booster.hint), 3);
     expect(p.soundOn, isTrue);
     expect(p.musicOn, isTrue);
     expect(p.hapticsOn, isTrue);
@@ -51,16 +51,14 @@ void main() {
     expect(p2.soundOn, isFalse);
   });
 
-  test('boosters can be spent and refilled but not below zero', () async {
+  test('boosters can be spent but not below zero', () async {
     final p = await load();
     expect(await p.useBooster(Booster.undo), isTrue);
-    expect(p.undoBoosters, 2);
+    expect(p.boosterCount(Booster.undo), 2);
     await p.useBooster(Booster.undo);
     await p.useBooster(Booster.undo);
     expect(await p.useBooster(Booster.undo), isFalse);
-    expect(p.undoBoosters, 0);
-    await p.addBooster(Booster.undo, 2);
-    expect(p.undoBoosters, 2);
+    expect(p.boosterCount(Booster.undo), 0);
   });
 
   test('reset clears progress but keeps settings', () async {
@@ -80,16 +78,16 @@ void main() {
   test('first clear of every 5th level rewards one of each booster', () async {
     final p = await load();
     expect(await p.recordWin(4, 5), isFalse);
-    expect(p.undoBoosters, 3);
+    expect(p.boosterCount(Booster.undo), 3);
     expect(await p.recordWin(5, 5), isTrue);
-    expect(p.undoBoosters, 4);
+    expect(p.boosterCount(Booster.undo), 4);
     for (final b in Booster.values) {
       expect(p.boosterCount(b), 4, reason: b.name);
     }
-    expect(p.hintBoosters, 4);
+    expect(p.boosterCount(Booster.hint), 4);
     // Replaying the same level gives nothing more.
     expect(await p.recordWin(5, 4), isFalse);
-    expect(p.undoBoosters, 4);
+    expect(p.boosterCount(Booster.undo), 4);
   });
 
   test('symbols setting persists and survives a reset', () async {

@@ -13,6 +13,9 @@ class StatsScreen extends StatelessWidget {
   static const double _iconSize = 26;
   static const double _valueLineHeight = 1;
 
+  /// Long labels ("Daily challenges cleared") wrap onto a second line.
+  static const int _labelLines = 2;
+
   @override
   Widget build(BuildContext context) {
     final p = ProgressScope.of(context);
@@ -67,7 +70,7 @@ class StatsScreen extends StatelessWidget {
                     const SizedBox(height: Gap.xs),
                     Text(
                       label,
-                      maxLines: 2,
+                      maxLines: _labelLines,
                       style: const TextStyle(
                         color: AppColors.textMuted,
                         fontSize: FontSizes.small,

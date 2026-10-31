@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'bus_escape_game.dart';
 import 'layout.dart';
 import 'symbols.dart';
-import 'vehicle_painter.dart';
+import 'passenger_painter.dart';
 import 'layers.dart';
 import 'palette.dart';
 

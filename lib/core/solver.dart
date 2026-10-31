@@ -3,15 +3,10 @@ import 'level.dart';
 import 'rules.dart';
 
 class SolveResult {
-  const SolveResult({
-    required this.order,
-    required this.nodes,
-    this.exhausted = false,
-  });
+  const SolveResult({required this.order, this.exhausted = false});
 
   /// Bus ids in tap order, or null if no solution was found.
   final List<int>? order;
-  final int nodes;
 
   /// True when the search hit its node limit, so a null [order] only means
   /// "not found in time", not "impossible".
@@ -64,7 +59,6 @@ class Solver {
     final ok = dfs(start);
     return SolveResult(
       order: ok ? List.of(path) : null,
-      nodes: nodes,
       exhausted: nodes > maxNodes,
     );
   }
